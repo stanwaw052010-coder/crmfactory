@@ -151,11 +151,8 @@ prisma/
 
 ## Деплой
 
-Застосунок лежить у підтеці `crm-factory/`, тому на будь-якому хостингу
-**обов'язково вкажіть Root Directory = `crm-factory`** — інакше збірка
-не знайде `package.json`.
-
-Потрібні дві речі: Node-хостинг і керована база PostgreSQL.
+Потрібні дві речі: Node-хостинг і керована база PostgreSQL. Обидві —
+з безкоштовним тарифом, якого вистачає для старту.
 
 ### Змінні середовища в продакшні
 
@@ -171,10 +168,10 @@ prisma/
 
 ### Vercel + керований Postgres (Neon / Supabase / Vercel Postgres)
 
-1. Import Project → оберіть репозиторій.
-2. **Root Directory:** `crm-factory` — єдина настройка, яку треба змінити
-   вручну. Команду збірки Vercel візьме з `crm-factory/vercel.json`
-   (`npm run build:deploy` — генерація клієнта, міграції, збірка).
+1. Import Project → оберіть цей репозиторій.
+2. Нічого в настройках змінювати не треба: команду збірки Vercel візьме
+   з `vercel.json` (`npm run build:deploy` — генерація Prisma-клієнта,
+   міграції, збірка).
 3. Додайте змінні з таблиці вище.
 4. Deploy.
 
@@ -196,11 +193,10 @@ DATABASE_URL="<продакшн-URL>" npm run db:seed
 
 ### Railway / Render (Postgres «в комплекті»)
 
-1. New Project → Deploy from GitHub.
-2. **Root Directory:** `crm-factory`.
-3. Додайте PostgreSQL — `DATABASE_URL` підставиться автоматично.
-4. **Build:** `npm run build:deploy`, **Start:** `npm start`.
-5. Допишіть решту змінних із таблиці.
+1. New Project → Deploy from GitHub → цей репозиторій.
+2. Додайте PostgreSQL — `DATABASE_URL` підставиться автоматично.
+3. **Build:** `npm run build:deploy`, **Start:** `npm start`.
+4. Допишіть решту змінних із таблиці.
 
 `npm start` читає `PORT` із середовища, тому платформа сама вибере порт.
 
