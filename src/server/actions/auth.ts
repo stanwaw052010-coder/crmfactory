@@ -160,13 +160,38 @@ export async function loginAction(
     }
 
     await createSession(user.id, meta);
-    await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+
+    // Роль супер-адміна платформи звіряється з SUPER_ADMIN_EMAIL при кожному
+    // вході, а не лише під час реєстрації. Інакше зміна цієї змінної на
+    // хостингу нічого б не давала існуючому акаунту, і власник платформи
+    // не міг би потрапити в /admin, не реєструючись наново.
+    //
+    // Синхронізація двостороння: доступ має рівно той акаунт, який зараз
+    // указано в змінній. Якщо змінна не задана — прапорець не чіпаємо,
+    // щоб не збивати локальні demo-дані.
+    const superAdminEmail = process.env.SUPER_ADMIN_EMAIL?.toLowerCase().trim();
+    const shouldBeSuperAdmin = superAdminEmail
+      ? user.email === superAdminEmail
+      : user.isSuperAdmin;
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date(), isSuperAdmin: shouldBeSuperAdmin },
+    });
+
+    if (shouldBeSuperAdmin !== user.isSuperAdmin) {
+      await audit({
+        userId: user.id,
+        action: shouldBeSuperAdmin ? "auth.super_admin_granted" : "auth.super_admin_revoked",
+        meta: { source: "SUPER_ADMIN_EMAIL" },
+      });
+    }
 
     const membership = user.memberships[0];
     if (membership) {
       await setActiveOrganization(membership.organizationId);
       if (!membership.organization.onboardingCompleted) target = "/onboarding";
-    } else if (user.isSuperAdmin) {
+    } else if (shouldBeSuperAdmin) {
       target = "/admin";
     } else {
       target = "/workspace/new";
