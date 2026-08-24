@@ -1,0 +1,620 @@
+// ─────────────────────────────────────────────────────────────────────────────
+//  crm.factory — database schema
+//
+//  Multi-tenant SaaS CRM. Кожна бізнес-сутність прив'язана до `organizationId`
+//  і НІКОЛИ не читається без tenant-фільтра (див. src/lib/db/tenant.ts).
+//
+//  Гроші зберігаються в мінорних одиницях (центах) як Int — жодних проблем
+//  з float-арифметикою та серіалізацією Decimal у React Server Components.
+//  Час зберігається в UTC; відображення — у таймзоні організації.
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Ідентичність та доступ ──────────────────────────────────────────────────
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  avatarUrl    String?
+  phone        String?
+  locale       String    @default("uk")
+  isSuperAdmin Boolean   @default(false)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  memberships         Membership[]
+  sessions            Session[]
+  notifications       Notification[]
+  auditLogs           AuditLog[]
+  clientNotes         ClientNote[]
+  createdAppointments Appointment[]  @relation("AppointmentCreatedBy")
+
+  @@index([email])
+}
+
+/// Серверна сесія з можливістю відкликання. У cookie лежить підписаний JWT,
+/// але кожен запит перевіряє, що сесія ще жива в БД.
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  userAgent String?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MANAGER
+  EMPLOYEE
+}
+
+enum MembershipStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+}
+
+/// Зв'язок користувача з організацією + його роль у ній.
+/// Саме цей запис — джерело істини для tenant-ізоляції та permissions.
+model Membership {
+  id             String           @id @default(cuid())
+  userId         String
+  organizationId String
+  role           Role             @default(EMPLOYEE)
+  status         MembershipStatus @default(ACTIVE)
+  employeeId     String?          @unique
+  invitedEmail   String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employee     Employee?            @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  overrides    PermissionOverride[]
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+}
+
+/// Точкове розширення/звуження прав понад базову роль.
+/// Backend перевіряє ці записи разом із матрицею ролей.
+model PermissionOverride {
+  id           String  @id @default(cuid())
+  membershipId String
+  permission   String
+  allowed      Boolean
+
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@unique([membershipId, permission])
+}
+
+// ─── Організація (tenant) ────────────────────────────────────────────────────
+
+model Organization {
+  id         String  @id @default(cuid())
+  name       String
+  slug       String  @unique
+  industry   String?
+  phone      String?
+  email      String?
+  address    String?
+  about      String?
+  logoUrl    String?
+  coverUrl   String?
+  brandColor String  @default("#2563EB")
+  timezone   String  @default("Europe/Kyiv")
+  currency   String  @default("EUR")
+  locale     String  @default("uk")
+
+  onboardingStep      Int     @default(0)
+  onboardingCompleted Boolean @default(false)
+
+  // Налаштування онлайн-запису
+  bookingEnabled      Boolean @default(true)
+  bookingAutoConfirm  Boolean @default(true)
+  bookingLeadTimeMin  Int     @default(120)
+  bookingHorizonDays  Int     @default(60)
+  bookingCancelHours  Int     @default(12)
+  bookingSlotStepMin  Int     @default(15)
+  bookingWelcomeText  String?
+  bookingRequireEmail Boolean @default(false)
+
+  // Налаштування нагадувань (канали — під майбутні інтеграції)
+  reminderEnabled     Boolean @default(true)
+  reminderHoursBefore Int     @default(24)
+  reminderChannels    String  @default("IN_APP")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships    Membership[]
+  employees      Employee[]
+  clients        Client[]
+  services       Service[]
+  categories     ServiceCategory[]
+  appointments   Appointment[]
+  payments       Payment[]
+  leads          Lead[]
+  pipelineStages PipelineStage[]
+  notifications  Notification[]
+  businessHours  BusinessHours[]
+  reminders      ReminderJob[]
+  auditLogs      AuditLog[]
+  subscription   Subscription?
+
+  @@index([slug])
+}
+
+enum Plan {
+  FREE
+  STARTER
+  BUSINESS
+  PRO
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+/// Підготовлено під Stripe: externalCustomerId / externalSubscriptionId
+/// заповнюються провайдером, решта логіки від провайдера не залежить.
+model Subscription {
+  id                     String             @id @default(cuid())
+  organizationId         String             @unique
+  plan                   Plan               @default(FREE)
+  status                 SubscriptionStatus @default(TRIALING)
+  seats                  Int                @default(3)
+  priceCents             Int                @default(0)
+  currency               String             @default("EUR")
+  currentPeriodStart     DateTime           @default(now())
+  currentPeriodEnd       DateTime?
+  trialEndsAt            DateTime?
+  cancelAtPeriodEnd      Boolean            @default(false)
+  externalCustomerId     String?
+  externalSubscriptionId String?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+/// Робочі години самого бізнесу (0 = неділя ... 6 = субота).
+model BusinessHours {
+  id             String  @id @default(cuid())
+  organizationId String
+  weekday        Int
+  openMinute     Int     @default(540)
+  closeMinute    Int     @default(1080)
+  isClosed       Boolean @default(false)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, weekday])
+}
+
+// ─── Команда ─────────────────────────────────────────────────────────────────
+
+model Employee {
+  id                   String    @id @default(cuid())
+  organizationId       String
+  name                 String
+  position             String?
+  email                String?
+  phone                String?
+  avatarUrl            String?
+  color                String    @default("#2563EB")
+  bio                  String?
+  isActive             Boolean   @default(true)
+  acceptsOnlineBooking Boolean   @default(true)
+  hiredAt              DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  membership   Membership?
+  schedules    EmployeeSchedule[]
+  exceptions   ScheduleException[]
+  services     EmployeeService[]
+  appointments Appointment[]
+  payments     Payment[]
+  leads        Lead[]
+
+  @@index([organizationId])
+  @@index([organizationId, isActive])
+}
+
+/// Тижневий графік. Хвилини від опівночі: 540 = 09:00, 1080 = 18:00.
+model EmployeeSchedule {
+  id          String  @id @default(cuid())
+  employeeId  String
+  weekday     Int
+  startMinute Int     @default(540)
+  endMinute   Int     @default(1080)
+  breakStart  Int?
+  breakEnd    Int?
+  isDayOff    Boolean @default(false)
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, weekday])
+}
+
+enum ExceptionType {
+  DAY_OFF
+  VACATION
+  SICK_LEAVE
+  CUSTOM_HOURS
+}
+
+/// Винятки з графіка: відпустка, вихідний, спеціальні години на конкретну дату.
+model ScheduleException {
+  id          String        @id @default(cuid())
+  employeeId  String
+  date        DateTime      @db.Date
+  endDate     DateTime?     @db.Date
+  type        ExceptionType @default(DAY_OFF)
+  startMinute Int?
+  endMinute   Int?
+  note        String?
+  createdAt   DateTime      @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, date])
+}
+
+// ─── Послуги ─────────────────────────────────────────────────────────────────
+
+model ServiceCategory {
+  id             String @id @default(cuid())
+  organizationId String
+  name           String
+  color          String @default("#2563EB")
+  sortOrder      Int    @default(0)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  services     Service[]
+
+  @@index([organizationId])
+}
+
+model Service {
+  id             String   @id @default(cuid())
+  organizationId String
+  categoryId     String?
+  name           String
+  description    String?
+  durationMin    Int      @default(60)
+  bufferMin      Int      @default(0)
+  priceCents     Int      @default(0)
+  color          String   @default("#2563EB")
+  isActive       Boolean  @default(true)
+  onlineBooking  Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  category     ServiceCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  employees    EmployeeService[]
+  appointments Appointment[]
+  leads        Lead[]
+
+  @@index([organizationId])
+  @@index([organizationId, isActive])
+}
+
+/// Хто яку послугу виконує (+ персональна ціна / тривалість).
+model EmployeeService {
+  id                 String @id @default(cuid())
+  employeeId         String
+  serviceId          String
+  priceCentsOverride Int?
+  durationOverride   Int?
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  service  Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, serviceId])
+  @@index([serviceId])
+}
+
+// ─── Клієнти ─────────────────────────────────────────────────────────────────
+
+enum ClientStatus {
+  NEW
+  ACTIVE
+  VIP
+  INACTIVE
+  BLOCKED
+}
+
+model Client {
+  id             String       @id @default(cuid())
+  organizationId String
+  firstName      String
+  lastName       String?
+  phone          String?
+  email          String?
+  status         ClientStatus @default(NEW)
+  source         String?
+  birthday       DateTime?    @db.Date
+  address        String?
+  tags           String[]     @default([])
+  marketingOptIn Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+  payments     Payment[]
+  notes        ClientNote[]
+  leads        Lead[]
+
+  @@index([organizationId])
+  @@index([organizationId, phone])
+  @@index([organizationId, status])
+  @@index([organizationId, createdAt])
+}
+
+/// Внутрішні нотатки менеджера — клієнт їх не бачить.
+model ClientNote {
+  id        String   @id @default(cuid())
+  clientId  String
+  authorId  String?
+  body      String
+  pinned    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  author User?  @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([clientId])
+}
+
+// ─── Записи ──────────────────────────────────────────────────────────────────
+
+enum AppointmentStatus {
+  WAITING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum AppointmentSource {
+  CRM
+  ONLINE
+  IMPORT
+}
+
+model Appointment {
+  id             String            @id @default(cuid())
+  organizationId String
+  clientId       String
+  serviceId      String
+  employeeId     String
+  startAt        DateTime
+  endAt          DateTime
+  status         AppointmentStatus @default(CONFIRMED)
+  source         AppointmentSource @default(CRM)
+  priceCents     Int               @default(0)
+  note           String?
+  internalNote   String?
+  createdById    String?
+  cancelledAt    DateTime?
+  cancelReason   String?
+  completedAt    DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  service      Service       @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  employee     Employee      @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  createdBy    User?         @relation("AppointmentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  payments     Payment[]
+  reminders    ReminderJob[]
+
+  @@index([organizationId, startAt])
+  @@index([organizationId, status])
+  @@index([employeeId, startAt])
+  @@index([clientId, startAt])
+}
+
+// ─── Продажі ─────────────────────────────────────────────────────────────────
+
+enum PaymentMethod {
+  CASH
+  CARD
+  ONLINE
+  TRANSFER
+  CERTIFICATE
+}
+
+enum PaymentStatus {
+  PAID
+  PENDING
+  REFUNDED
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  organizationId String
+  appointmentId  String?
+  clientId       String?
+  employeeId     String?
+  amountCents    Int
+  currency       String        @default("EUR")
+  method         PaymentMethod @default(CASH)
+  status         PaymentStatus @default(PAID)
+  paidAt         DateTime      @default(now())
+  note           String?
+  externalId     String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  appointment  Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  client       Client?      @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  employee     Employee?    @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, paidAt])
+  @@index([organizationId, status])
+}
+
+// ─── Воронка продажів ────────────────────────────────────────────────────────
+
+model PipelineStage {
+  id             String  @id @default(cuid())
+  organizationId String
+  key            String
+  name           String
+  color          String  @default("#2563EB")
+  sortOrder      Int     @default(0)
+  isWon          Boolean @default(false)
+  isLost         Boolean @default(false)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  leads        Lead[]
+
+  @@unique([organizationId, key])
+  @@index([organizationId])
+}
+
+model Lead {
+  id             String   @id @default(cuid())
+  organizationId String
+  stageId        String
+  clientId       String?
+  serviceId      String?
+  assignedToId   String?
+  name           String
+  phone          String?
+  email          String?
+  source         String?
+  valueCents     Int      @default(0)
+  note           String?
+  position       Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  stage        PipelineStage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  client       Client?       @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  service      Service?      @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  assignedTo   Employee?     @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, stageId])
+}
+
+// ─── Сповіщення та нагадування ───────────────────────────────────────────────
+
+enum NotificationType {
+  BOOKING_CREATED
+  BOOKING_CANCELLED
+  APPOINTMENT_REMINDER
+  CLIENT_CREATED
+  PAYMENT_RECEIVED
+  SYSTEM
+}
+
+model Notification {
+  id             String           @id @default(cuid())
+  organizationId String
+  userId         String?
+  type           NotificationType @default(SYSTEM)
+  title          String
+  body           String?
+  entityType     String?
+  entityId       String?
+  readAt         DateTime?
+  createdAt      DateTime         @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([userId, readAt])
+}
+
+enum ReminderChannel {
+  IN_APP
+  EMAIL
+  TELEGRAM
+  SMS
+  WHATSAPP
+}
+
+enum ReminderStatus {
+  PENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+/// Черга нагадувань. Один запис = одне повідомлення в один канал.
+/// Воркер (наступний етап) забирає PENDING зі scheduledFor <= now.
+model ReminderJob {
+  id             String          @id @default(cuid())
+  organizationId String
+  appointmentId  String
+  channel        ReminderChannel @default(IN_APP)
+  status         ReminderStatus  @default(PENDING)
+  scheduledFor   DateTime
+  sentAt         DateTime?
+  attempts       Int             @default(0)
+  error          String?
+  payload        Json?
+  createdAt      DateTime        @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  appointment  Appointment  @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@index([status, scheduledFor])
+  @@index([appointmentId])
+}
+
+// ─── Аудит ───────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String?
+  userId         String?
+  action         String
+  entityType     String?
+  entityId       String?
+  meta           Json?
+  ip             String?
+  userAgent      String?
+  createdAt      DateTime @default(now())
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([userId, createdAt])
+}

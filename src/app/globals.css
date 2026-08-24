@@ -1,0 +1,300 @@
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   crm.factory — design system
+   Синій — головний фірмовий колір. Світла тема — основна,
+   темна — окрема повноцінна палітра, а не інверсія.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Фірмовий синій */
+  --color-brand-50: #eff5ff;
+  --color-brand-100: #dbe8fe;
+  --color-brand-200: #bfd7fe;
+  --color-brand-300: #93bbfd;
+  --color-brand-400: #6096fa;
+  --color-brand-500: #3b76f6;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4fd8;
+  --color-brand-800: #1e40af;
+  --color-brand-900: #1e3a8a;
+  --color-brand-950: #172554;
+
+  /* Electric / royal — акценти бренду */
+  --color-electric: #0d47ff;
+  --color-royal: #2563eb;
+  --color-cyan: #38bdf8;
+
+  /* Глибокі відтінки для темної теми та лендінгу */
+  --color-navy-950: #050b1f;
+  --color-navy-900: #081225;
+  --color-navy-800: #0b1a33;
+  --color-navy-700: #0d2145;
+  --color-navy-600: #123061;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+
+  --radius-card: 16px;
+  --radius-panel: 18px;
+
+  --shadow-soft: 0 1px 2px rgb(15 23 42 / 0.04), 0 4px 16px -4px rgb(15 23 42 / 0.08);
+  --shadow-lift: 0 2px 4px rgb(15 23 42 / 0.04), 0 12px 32px -8px rgb(15 23 42 / 0.14);
+  --shadow-pop: 0 24px 60px -12px rgb(15 23 42 / 0.24);
+  --shadow-brand: 0 8px 24px -8px rgb(37 99 235 / 0.5);
+
+  --animate-in: fade-in 0.18s ease-out;
+}
+
+/* ── Семантичні токени ─────────────────────────────────────────────────── */
+
+:root {
+  --bg: #f6f8fc;
+  --bg-subtle: #eef2f9;
+  --surface: #ffffff;
+  --surface-2: #f8fafc;
+  --surface-hover: #f1f5f9;
+  --border: #e3e9f2;
+  --border-strong: #cbd5e1;
+  --fg: #0f172a;
+  --fg-muted: #64748b;
+  --fg-subtle: #94a3b8;
+  --primary: #2563eb;
+  --primary-fg: #ffffff;
+  --primary-soft: #eff5ff;
+  --ring: #2563eb;
+
+  --success: #059669;
+  --success-soft: #ecfdf5;
+  --warning: #d97706;
+  --warning-soft: #fffbeb;
+  --danger: #dc2626;
+  --danger-soft: #fef2f2;
+  --info: #0284c7;
+  --info-soft: #f0f9ff;
+
+  --sidebar: #ffffff;
+  --sidebar-border: #e3e9f2;
+
+  color-scheme: light;
+}
+
+.dark {
+  --bg: #050b1f;
+  --bg-subtle: #081225;
+  --surface: #0b1626;
+  --surface-2: #0f1d31;
+  --surface-hover: #142440;
+  --border: #1c2c48;
+  --border-strong: #2a3f63;
+  --fg: #eef4ff;
+  --fg-muted: #90a3c0;
+  --fg-subtle: #64789b;
+  --primary: #3b76f6;
+  --primary-fg: #ffffff;
+  --primary-soft: #12224a;
+  --ring: #4d84f8;
+
+  --success: #34d399;
+  --success-soft: #06251d;
+  --warning: #fbbf24;
+  --warning-soft: #2a1c05;
+  --danger: #f87171;
+  --danger-soft: #2c0f11;
+  --info: #38bdf8;
+  --info-soft: #04202f;
+
+  --sidebar: #071021;
+  --sidebar-border: #16243c;
+
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-subtle: var(--bg-subtle);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-hover: var(--surface-hover);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-primary: var(--primary);
+  --color-primary-fg: var(--primary-fg);
+  --color-primary-soft: var(--primary-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-line: var(--sidebar-border);
+}
+
+/* ── База ──────────────────────────────────────────────────────────────── */
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--primary) 22%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Тонкі скролбари — без візуального шуму */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--fg-subtle);
+  background-clip: content-box;
+  border: 3px solid transparent;
+}
+
+/* ── Утиліти ───────────────────────────────────────────────────────────── */
+
+@utility card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-soft);
+}
+
+@utility panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+}
+
+@utility glass {
+  background: color-mix(in oklab, var(--surface) 78%, transparent);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+}
+
+@utility text-gradient-brand {
+  background: linear-gradient(120deg, var(--color-brand-500), var(--color-cyan));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ── Анімації (короткі: 150–300ms) ─────────────────────────────────────── */
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slide-left {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.85); }
+}
+
+.animate-fade-in { animation: fade-in 0.18s ease-out both; }
+.animate-fade-up { animation: fade-up 0.24s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-scale-in { animation: scale-in 0.18s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-slide-left { animation: slide-left 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+
+/* Skeleton із «пробігаючим» відблиском */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-hover);
+  border-radius: 8px;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--surface) 60%, transparent),
+    transparent
+  );
+  animation: shimmer 1.5s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Друк: приховуємо навігацію */
+@media print {
+  .no-print { display: none !important; }
+}
