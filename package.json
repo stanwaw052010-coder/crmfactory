@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev -p 3001",
     "build": "prisma generate && next build",
-    "start": "next start -p 3001",
+    "start": "next start",
     "lint": "next lint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
@@ -13,7 +13,9 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "prisma migrate reset --force",
-    "setup": "prisma generate && prisma migrate deploy && tsx prisma/seed.ts"
+    "setup": "prisma generate && prisma migrate deploy && tsx prisma/seed.ts",
+    "postinstall": "prisma generate",
+    "build:deploy": "prisma generate && prisma migrate deploy && next build"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

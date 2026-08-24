@@ -139,12 +139,83 @@ prisma/
 | Команда | Дія |
 |---|---|
 | `npm run dev` | Dev-сервер на :3001 |
-| `npm run build` / `start` | Продакшн-збірка та запуск |
+| `npm run build` / `start` | Продакшн-збірка та запуск (порт із `PORT`, типово 3000) |
+| `npm run build:deploy` | Збірка з міграціями — для хостингу |
 | `npm run setup` | Міграції + seed (перший запуск) |
 | `npm run db:migrate` | Нова міграція в dev |
 | `npm run db:seed` | Перестворити demo-workspace |
 | `npm run db:reset` | Скинути БД і засіяти заново |
 | `npm run lint` | ESLint |
+
+---
+
+## Деплой
+
+Застосунок лежить у підтеці `crm-factory/`, тому на будь-якому хостингу
+**обов'язково вкажіть Root Directory = `crm-factory`** — інакше збірка
+не знайде `package.json`.
+
+Потрібні дві речі: Node-хостинг і керована база PostgreSQL.
+
+### Змінні середовища в продакшні
+
+| Змінна | Значення |
+|---|---|
+| `DATABASE_URL` | рядок підключення від вашого Postgres-провайдера |
+| `AUTH_SECRET` | `openssl rand -base64 48` — новий, не той, що локально |
+| `NEXT_PUBLIC_APP_URL` | `https://ваш-домен` (без слеша в кінці) |
+| `SUPER_ADMIN_EMAIL` | email, який отримає доступ до `/admin` |
+
+`NEXT_PUBLIC_APP_URL` вшивається у збірку — після зміни домену потрібен
+повторний деплой.
+
+### Vercel + керований Postgres (Neon / Supabase / Vercel Postgres)
+
+1. Import Project → оберіть репозиторій.
+2. **Root Directory:** `crm-factory`.
+3. **Build Command:** `npm run build:deploy` — на відміну від звичайного
+   `build`, він ще й накочує міграції (`prisma migrate deploy`).
+4. Додайте змінні з таблиці вище.
+5. Deploy.
+
+Після першого деплою наповніть базу demo-даними (необов'язково):
+
+```bash
+DATABASE_URL="<продакшн-URL>" npm run db:seed
+```
+
+> Neon і Supabase працюють через пул з'єднань. Якщо провайдер дає два рядки —
+> вкажіть pooled-URL у `DATABASE_URL`, а прямий додайте як `DIRECT_URL`
+> і пропишіть його в `datasource` (`directUrl = env("DIRECT_URL")`):
+> міграціям потрібне пряме з'єднання.
+
+### Railway / Render (Postgres «в комплекті»)
+
+1. New Project → Deploy from GitHub.
+2. **Root Directory:** `crm-factory`.
+3. Додайте PostgreSQL — `DATABASE_URL` підставиться автоматично.
+4. **Build:** `npm run build:deploy`, **Start:** `npm start`.
+5. Допишіть решту змінних із таблиці.
+
+`npm start` читає `PORT` із середовища, тому платформа сама вибере порт.
+
+### Docker / власний сервер
+
+```bash
+npm ci
+npm run build:deploy      # генерація клієнта + міграції + збірка
+PORT=3000 npm start
+```
+
+Перед сервісом поставте reverse-proxy з HTTPS: session-cookie у продакшні
+позначена `secure`, тож без TLS вхід не працюватиме.
+
+### Після деплою перевірте
+
+- вхід і реєстрація нового workspace;
+- `/book/<slug>` відкривається й показує вільні слоти;
+- створений онлайн-запис з'явився в календарі CRM;
+- у Налаштуваннях → Онлайн-запис посилання веде на ваш домен, а не на localhost.
 
 ---
 
