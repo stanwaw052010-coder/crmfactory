@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
-import type { Role } from "@prisma/client";
+import type { Plan, Role } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { readActiveOrganization, readSession } from "@/lib/auth/session";
 import {
@@ -9,6 +9,7 @@ import {
   type Permission,
   type PermissionOverrideMap,
 } from "@/lib/permissions";
+import { planAllows } from "@/lib/plans";
 
 export type SessionUser = {
   id: string;
@@ -93,11 +94,20 @@ export const getAuthContext = cache(async (): Promise<AuthContext | null> => {
     plan: m.organization.subscription?.plan ?? "FREE",
   });
 
+  // Тариф звужує права ПІСЛЯ ролі й override-ів: інакше платну функцію
+  // можна було б відкрити точковим дозволом в обхід оплати.
+  const plan = (active.organization.subscription?.plan ?? "FREE") as Plan;
+  const permissions = new Set(
+    Array.from(resolvePermissions(active.role, overrides)).filter((permission) =>
+      planAllows(plan, permission),
+    ),
+  );
+
   return {
     user,
     organization: toSummary(active),
     membership: { id: active.id, role: active.role, employeeId: active.employeeId },
-    permissions: resolvePermissions(active.role, overrides),
+    permissions,
     organizations: memberships.map(toSummary),
   };
 });

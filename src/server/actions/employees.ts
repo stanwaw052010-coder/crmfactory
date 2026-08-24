@@ -16,6 +16,8 @@ import { audit } from "@/lib/audit";
 import { hashPassword } from "@/lib/auth/password";
 import { defaultSchedule } from "@/server/bootstrap";
 import { PERMISSIONS, type Permission } from "@/lib/permissions";
+import { employeeLimit, PLAN_LABELS } from "@/lib/plans";
+import type { Plan } from "@prisma/client";
 
 function parseEmployeeForm(formData: FormData) {
   return employeeSchema.parse({
@@ -45,6 +47,22 @@ export async function createEmployeeAction(
     const ctx = await requirePermission("employee.manage");
     const input = parseEmployeeForm(formData);
     await assertServicesInOrg(input.serviceIds, ctx.organization.id);
+
+    // Тариф продається за кількістю співробітників — це єдиний жорсткий ліміт.
+    // Рахуємо тільки активних: деактивований профіль зберігає історію записів
+    // і не має займати оплачене місце.
+    const limit = employeeLimit(ctx.organization.plan as Plan);
+    if (limit !== null) {
+      const active = await prisma.employee.count({
+        where: { organizationId: ctx.organization.id, isActive: true },
+      });
+      if (active >= limit) {
+        return fail(
+          `На тарифі ${PLAN_LABELS[ctx.organization.plan as Plan]} доступно ${limit} ` +
+            `${limit === 1 ? "співробітник" : "співробітників"}. Перейдіть на вищий тариф у Налаштуваннях → Тариф.`,
+        );
+      }
+    }
 
     const employee = await prisma.employee.create({
       data: {

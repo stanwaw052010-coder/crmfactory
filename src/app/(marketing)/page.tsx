@@ -275,15 +275,16 @@ export default function LandingPage() {
             Прозорі тарифи
           </h2>
           <p className="mx-auto mt-4 max-w-lg text-center text-[15px] text-balance text-[var(--fg-muted)]">
-            Почніть безкоштовно. Переходьте на платний тариф, коли зростете.
+            Почніть безкоштовно. Клієнтська база без обмежень на всіх тарифах —
+            платите тільки за розмір команди.
           </p>
 
           <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { name: "Free", price: "€0", text: "1 співробітник, до 50 клієнтів" },
-              { name: "Starter", price: "€19", text: "До 3 співробітників, воронка" },
-              { name: "Business", price: "€39", text: "До 10 співробітників, аналітика", highlight: true },
-              { name: "Pro", price: "€79", text: "Необмежена команда, кілька workspace" },
+              { name: "Free", price: "€0", text: "1 співробітник, клієнти без обмежень" },
+              { name: "Starter", price: "€14", text: "До 3 співробітників, воронка продажів" },
+              { name: "Business", price: "€29", text: "До 10 співробітників, повна аналітика", highlight: true },
+              { name: "Pro", price: "€59", text: "Необмежена команда, кілька філій" },
             ].map((plan) => (
               <div
                 key={plan.name}

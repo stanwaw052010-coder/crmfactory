@@ -166,6 +166,19 @@ export async function createWorkspaceAction(
     const name = String(formData.get("name") ?? "").trim();
     if (name.length < 2) return fail("Вкажіть назву бізнесу", { name: "Мінімум 2 символи" });
 
+    // Кілька філій — можливість тарифу Pro. Перевіряємо по всіх організаціях,
+    // де користувач власник: обмеження стосується того, хто платить.
+    const owned = await prisma.membership.findMany({
+      where: { userId: user.id, role: "OWNER", status: "ACTIVE" },
+      select: { organization: { select: { subscription: { select: { plan: true } } } } },
+    });
+    const hasPro = owned.some((m) => m.organization.subscription?.plan === "PRO");
+    if (owned.length >= 1 && !hasPro) {
+      return fail(
+        "Кілька філій доступні на тарифі Pro. Оновіть тариф у Налаштуваннях → Тариф.",
+      );
+    }
+
     let slug = slugify(name) || "workspace";
     const exists = await prisma.organization.findUnique({ where: { slug }, select: { id: true } });
     if (exists) slug = `${slug}-${Math.random().toString(36).slice(2, 6)}`;
