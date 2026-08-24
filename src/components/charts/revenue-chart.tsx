@@ -41,7 +41,7 @@ export function RevenueChart({
   return (
     <div style={{ height }} className="w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: compact ? -20 : -8 }}>
+        <AreaChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={theme.primary} stopOpacity={0.28} />
@@ -62,7 +62,7 @@ export function RevenueChart({
             tick={{ fill: theme.axis, fontSize: 11.5 }}
             tickLine={false}
             axisLine={false}
-            width={compact ? 44 : 56}
+            width={compact ? 52 : 60}
             tickFormatter={(value: number) =>
               value >= 1000 ? `${symbol}${(value / 1000).toFixed(1)}k` : `${symbol}${value}`
             }

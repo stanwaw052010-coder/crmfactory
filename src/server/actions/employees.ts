@@ -310,30 +310,41 @@ export async function inviteMemberAction(
       if (taken) return fail("До цього співробітника вже прив'язано користувача");
     }
 
-    let user = await prisma.user.findUnique({ where: { email: input.email } });
-    if (user) {
-      const existing = await prisma.membership.findUnique({
-        where: { userId_organizationId: { userId: user.id, organizationId: ctx.organization.id } },
-      });
-      if (existing) return fail("Цей користувач вже є в команді");
-    } else {
-      user = await prisma.user.create({
-        data: {
-          email: input.email,
-          name: input.name,
-          passwordHash: await hashPassword(input.password),
+    const existingUser = await prisma.user.findUnique({ where: { email: input.email } });
+    if (existingUser) {
+      const existingMembership = await prisma.membership.findUnique({
+        where: {
+          userId_organizationId: {
+            userId: existingUser.id,
+            organizationId: ctx.organization.id,
+          },
         },
       });
+      if (existingMembership) return fail("Цей користувач вже є в команді");
     }
 
-    await prisma.membership.create({
-      data: {
-        userId: user.id,
-        organizationId: ctx.organization.id,
-        role: input.role,
-        employeeId: input.employeeId ?? null,
-        status: "ACTIVE",
-      },
+    const passwordHash = existingUser ? null : await hashPassword(input.password);
+
+    // Створення користувача й членства — в одній транзакції: інакше збій на
+    // другому кроці лишив би «осиротілий» акаунт без доступу до жодної організації.
+    const user = await prisma.$transaction(async (tx) => {
+      const account =
+        existingUser ??
+        (await tx.user.create({
+          data: { email: input.email, name: input.name, passwordHash: passwordHash! },
+        }));
+
+      await tx.membership.create({
+        data: {
+          userId: account.id,
+          organizationId: ctx.organization.id,
+          role: input.role,
+          employeeId: input.employeeId ?? null,
+          status: "ACTIVE",
+        },
+      });
+
+      return account;
     });
 
     await audit({

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { requirePermission } from "@/lib/auth/context";
+import { requireViewPermission } from "@/lib/auth/context";
 import { getClientProfile } from "@/server/queries/clients";
 import { ClientProfile } from "@/features/clients/client-profile";
 
@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: "Профіль клієнта" };
 
 export default async function ClientPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const ctx = await requirePermission("client.view");
+  const ctx = await requireViewPermission("client.view");
   const data = await getClientProfile(ctx.organization.id, id);
   if (!data) notFound();
 

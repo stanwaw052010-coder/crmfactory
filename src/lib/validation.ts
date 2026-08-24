@@ -9,13 +9,31 @@ import { z } from "zod";
 const requiredString = (label: string, max = 200) =>
   z.string().trim().min(1, `${label} — обов'язкове поле`).max(max, `${label}: забагато символів`);
 
+/**
+ * Нормалізація значень із HTML-форми.
+ *
+ * `formData.get()` повертає `null` для поля, якого у формі немає, і `""` для
+ * порожнього input чи `<select>` без вибору. Обидва випадки означають
+ * «значення не задано», тому зводимо їх до `undefined` ДО валідації.
+ *
+ * Наївне `z.string().optional().or(z.literal("").transform(...))` тут не
+ * працює: перша гілка union'а приймає `""` як валідний рядок і повертає його,
+ * а порожній id далі падає на foreign key — саме так ламалося створення
+ * послуги, заявки та запрошення в команду.
+ */
+const formValue = z
+  .union([z.string(), z.null(), z.undefined()])
+  .transform((value) => {
+    if (value == null) return undefined;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  });
+
 const optionalString = (max = 500) =>
-  z
-    .string()
-    .trim()
-    .max(max)
-    .optional()
-    .transform((v) => (v ? v : undefined));
+  formValue.pipe(z.string().max(max, "Забагато символів").optional());
+
+/** Необов'язкове посилання на іншу сутність (id із `<select>`). */
+const optionalId = () => formValue.pipe(z.string().max(64).optional());
 
 export const phoneSchema = z
   .string()
@@ -25,6 +43,9 @@ export const phoneSchema = z
   .regex(/^[+\d][\d\s()\-.]*$/, "Номер може містити лише цифри, пробіли та + ( ) -");
 
 export const emailSchema = z.string().trim().toLowerCase().email("Некоректний email");
+
+const optionalPhone = () => formValue.pipe(phoneSchema.optional());
+const optionalEmail = () => formValue.pipe(emailSchema.optional());
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -50,11 +71,11 @@ export const registerSchema = z.object({
 export const clientSchema = z.object({
   firstName: requiredString("Ім'я", 60),
   lastName: optionalString(60),
-  phone: phoneSchema.optional().or(z.literal("").transform(() => undefined)),
-  email: emailSchema.optional().or(z.literal("").transform(() => undefined)),
+  phone: optionalPhone(),
+  email: optionalEmail(),
   status: z.enum(["NEW", "ACTIVE", "VIP", "INACTIVE", "BLOCKED"]).default("NEW"),
   source: optionalString(60),
-  birthday: z.string().optional().or(z.literal("")),
+  birthday: optionalString(40),
   address: optionalString(200),
   tags: z.array(z.string().trim().max(24)).max(10).default([]),
   marketingOptIn: z.boolean().default(false),
@@ -71,7 +92,7 @@ export const clientNoteSchema = z.object({
 export const serviceSchema = z.object({
   name: requiredString("Назва послуги", 100),
   description: optionalString(1000),
-  categoryId: z.string().optional().or(z.literal("").transform(() => undefined)),
+  categoryId: optionalId(),
   durationMin: z.coerce.number().int().min(5, "Мінімум 5 хвилин").max(600, "Максимум 10 годин"),
   bufferMin: z.coerce.number().int().min(0).max(120).default(0),
   priceCents: z.coerce.number().int().min(0, "Ціна не може бути від'ємною").max(100_000_00),
@@ -91,8 +112,8 @@ export const serviceCategorySchema = z.object({
 export const employeeSchema = z.object({
   name: requiredString("Ім'я співробітника", 80),
   position: optionalString(80),
-  email: emailSchema.optional().or(z.literal("").transform(() => undefined)),
-  phone: phoneSchema.optional().or(z.literal("").transform(() => undefined)),
+  email: optionalEmail(),
+  phone: optionalPhone(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#2563EB"),
   bio: optionalString(500),
   isActive: z.boolean().default(true),
@@ -117,7 +138,7 @@ export const scheduleSchema = z.object({
 export const scheduleExceptionSchema = z.object({
   employeeId: z.string().min(1),
   date: z.string().min(1, "Оберіть дату"),
-  endDate: z.string().optional().or(z.literal("")),
+  endDate: optionalString(40),
   type: z.enum(["DAY_OFF", "VACATION", "SICK_LEAVE", "CUSTOM_HOURS"]).default("DAY_OFF"),
   startMinute: z.coerce.number().int().min(0).max(1440).optional(),
   endMinute: z.coerce.number().int().min(0).max(1440).optional(),
@@ -154,13 +175,13 @@ export const appointmentStatusSchema = z.object({
 // ── Продажі ──────────────────────────────────────────────────────────────────
 
 export const paymentSchema = z.object({
-  appointmentId: z.string().optional().or(z.literal("").transform(() => undefined)),
-  clientId: z.string().optional().or(z.literal("").transform(() => undefined)),
-  employeeId: z.string().optional().or(z.literal("").transform(() => undefined)),
+  appointmentId: optionalId(),
+  clientId: optionalId(),
+  employeeId: optionalId(),
   amountCents: z.coerce.number().int().min(0).max(1_000_000_00),
   method: z.enum(["CASH", "CARD", "ONLINE", "TRANSFER", "CERTIFICATE"]).default("CASH"),
   status: z.enum(["PAID", "PENDING", "REFUNDED"]).default("PAID"),
-  paidAt: z.string().optional(),
+  paidAt: optionalString(40),
   note: optionalString(300),
 });
 
@@ -168,12 +189,12 @@ export const paymentSchema = z.object({
 
 export const leadSchema = z.object({
   name: requiredString("Ім'я", 80),
-  phone: phoneSchema.optional().or(z.literal("").transform(() => undefined)),
-  email: emailSchema.optional().or(z.literal("").transform(() => undefined)),
+  phone: optionalPhone(),
+  email: optionalEmail(),
   stageId: z.string().min(1, "Оберіть етап"),
-  clientId: z.string().optional().or(z.literal("").transform(() => undefined)),
-  serviceId: z.string().optional().or(z.literal("").transform(() => undefined)),
-  assignedToId: z.string().optional().or(z.literal("").transform(() => undefined)),
+  clientId: optionalId(),
+  serviceId: optionalId(),
+  assignedToId: optionalId(),
   valueCents: z.coerce.number().int().min(0).max(1_000_000_00).default(0),
   source: optionalString(60),
   note: optionalString(1000),
@@ -190,8 +211,8 @@ export const leadMoveSchema = z.object({
 export const organizationSchema = z.object({
   name: requiredString("Назва бізнесу", 80),
   industry: optionalString(60),
-  phone: phoneSchema.optional().or(z.literal("").transform(() => undefined)),
-  email: emailSchema.optional().or(z.literal("").transform(() => undefined)),
+  phone: optionalPhone(),
+  email: optionalEmail(),
   address: optionalString(200),
   about: optionalString(600),
   timezone: requiredString("Часовий пояс", 60),
@@ -246,13 +267,13 @@ export const inviteSchema = z.object({
   email: emailSchema,
   name: requiredString("Ім'я", 80),
   role: z.enum(["ADMIN", "MANAGER", "EMPLOYEE"]).default("EMPLOYEE"),
-  employeeId: z.string().optional().or(z.literal("").transform(() => undefined)),
+  employeeId: optionalId(),
   password: z.string().min(8, "Пароль — щонайменше 8 символів").max(128),
 });
 
 export const profileSchema = z.object({
   name: requiredString("Ім'я", 80),
-  phone: phoneSchema.optional().or(z.literal("").transform(() => undefined)),
+  phone: optionalPhone(),
 });
 
 export const passwordChangeSchema = z
@@ -280,7 +301,7 @@ export const publicBookingSchema = z.object({
   time: z.string().regex(/^\d{2}:\d{2}$/, "Оберіть час"),
   name: requiredString("Ваше ім'я", 80),
   phone: phoneSchema,
-  email: emailSchema.optional().or(z.literal("").transform(() => undefined)),
+  email: optionalEmail(),
   comment: optionalString(500),
 });
 

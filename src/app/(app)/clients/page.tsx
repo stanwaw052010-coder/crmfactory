@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import type { ClientStatus } from "@prisma/client";
-import { requirePermission } from "@/lib/auth/context";
+import { requireViewPermission } from "@/lib/auth/context";
 import { listClients } from "@/server/queries/clients";
 import { PageHeader } from "@/components/shared/page-header";
 import { SkeletonTable } from "@/components/ui/skeleton";
@@ -46,7 +46,7 @@ async function ClientsContent({
   page: number;
   openNew: boolean;
 }) {
-  const ctx = await requirePermission("client.view");
+  const ctx = await requireViewPermission("client.view");
   const data = await listClients({
     organizationId: ctx.organization.id,
     query,

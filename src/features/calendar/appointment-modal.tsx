@@ -70,11 +70,16 @@ export function AppointmentModal({
   const [price, setPrice] = React.useState("0");
   const [status, setStatus] = React.useState("CONFIRMED");
   const [slots, setSlots] = React.useState<string[] | null>(null);
-  const [slotsLoading, setSlotsLoading] = React.useState(false);
+  const [slotsLoading, startSlots] = React.useTransition();
 
   // Наповнення форми при відкритті: редагування — з запису, створення — з дефолтів.
-  React.useEffect(() => {
-    if (!open) return;
+  // Робимо під час рендеру (документований React-патерн), а не в ефекті —
+  // інакше користувач на мить побачив би попередні значення.
+  const [formKey, setFormKey] = React.useState(() => `${open}:${appointment?.id ?? "new"}`);
+  const nextFormKey = `${open}:${appointment?.id ?? "new"}`;
+  if (formKey !== nextFormKey) {
+    setFormKey(nextFormKey);
+    if (open) {
     if (appointment) {
       const start = new Date(appointment.startAt);
       const end = new Date(appointment.endAt);
@@ -101,7 +106,8 @@ export function AppointmentModal({
       setStatus("CONFIRMED");
     }
     setShowClientList(false);
-  }, [open, appointment, defaults, employees, lockedEmployeeId]);
+    }
+  }
 
   // Вибір послуги підставляє її тривалість і ціну — але не перетирає
   // те, що менеджер уже змінив вручну під час редагування.
@@ -119,22 +125,20 @@ export function AppointmentModal({
   // Вільні слоти для обраного співробітника й дати.
   React.useEffect(() => {
     if (!open || !employeeId || !date) {
-      setSlots(null);
+      startSlots(() => setSlots(null));
       return;
     }
     let cancelled = false;
-    setSlotsLoading(true);
-    getFreeSlotsAction({
-      employeeId,
-      date,
-      durationMin: duration,
-      ignoreAppointmentId: appointment?.id,
-    })
-      .then((res) => {
-        if (cancelled) return;
-        setSlots(res.ok ? res.data : null);
-      })
-      .finally(() => !cancelled && setSlotsLoading(false));
+    startSlots(async () => {
+      const res = await getFreeSlotsAction({
+        employeeId,
+        date,
+        durationMin: duration,
+        ignoreAppointmentId: appointment?.id,
+      });
+      if (cancelled) return;
+      setSlots(res.ok ? res.data : null);
+    });
     return () => {
       cancelled = true;
     };
@@ -269,7 +273,7 @@ export function AppointmentModal({
                 )}
                 {filteredClients.length === 0 && clientQuery.trim().length < 2 && (
                   <p className="px-2.5 py-3 text-[12.5px] text-[var(--fg-subtle)]">
-                    Введіть ім'я, щоб знайти або створити клієнта
+                    Введіть ім&apos;я, щоб знайти або створити клієнта
                   </p>
                 )}
               </div>

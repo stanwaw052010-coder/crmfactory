@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useIsClient } from "@/hooks/use-is-client";
 import { Button } from "@/components/ui/button";
 
 const WIDTHS = {
@@ -33,9 +34,7 @@ export function Modal({
   size?: keyof typeof WIDTHS;
   className?: string;
 }) {
-  const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => setMounted(true), []);
-
+  const mounted = useIsClient();
   React.useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {

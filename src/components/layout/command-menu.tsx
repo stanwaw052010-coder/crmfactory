@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDebounced } from "@/hooks/use-debounced";
+import { useIsClient } from "@/hooks/use-is-client";
 import { searchAction } from "@/server/actions/search";
 import type { SearchResult } from "@/server/queries/search";
 
@@ -50,12 +51,10 @@ export function CommandMenu({ permissions }: { permissions: string[] }) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const [results, setResults] = React.useState<SearchResult[]>([]);
-  const [loading, setLoading] = React.useState(false);
+  const [loading, startSearch] = React.useTransition();
   const [index, setIndex] = React.useState(0);
-  const [mounted, setMounted] = React.useState(false);
+  const mounted = useIsClient();
   const debounced = useDebounced(query, 220);
-
-  React.useEffect(() => setMounted(true), []);
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -74,29 +73,29 @@ export function CommandMenu({ permissions }: { permissions: string[] }) {
     };
   }, []);
 
-  React.useEffect(() => {
+  // Закрили меню — скидаємо пошук. Під час рендеру, без ефекту.
+  const [wasOpen, setWasOpen] = React.useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
     if (!open) {
       setQuery("");
       setResults([]);
       setIndex(0);
     }
-  }, [open]);
+  }
 
   React.useEffect(() => {
     let cancelled = false;
     if (debounced.trim().length < 2) {
-      setResults([]);
-      setLoading(false);
+      startSearch(() => setResults([]));
       return;
     }
-    setLoading(true);
-    searchAction(debounced)
-      .then((res) => {
-        if (cancelled) return;
-        setResults(res.ok ? res.data : []);
-        setIndex(0);
-      })
-      .finally(() => !cancelled && setLoading(false));
+    startSearch(async () => {
+      const res = await searchAction(debounced);
+      if (cancelled) return;
+      setResults(res.ok ? res.data : []);
+      setIndex(0);
+    });
     return () => {
       cancelled = true;
     };

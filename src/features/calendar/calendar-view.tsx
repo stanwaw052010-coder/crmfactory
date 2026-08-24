@@ -76,20 +76,29 @@ export function CalendarView(props: {
     [router, pathname, searchParams],
   );
 
-  React.useEffect(() => {
+  // Реакція на зміну props без ефектів: порівнюємо з попереднім значенням
+  // просто під час рендеру — React одразу перезапускає рендер із новим станом.
+  const [seenAppointmentId, setSeenAppointmentId] = React.useState(props.openAppointmentId);
+  if (seenAppointmentId !== props.openAppointmentId) {
+    setSeenAppointmentId(props.openAppointmentId);
     setDetailsId(props.openAppointmentId);
-  }, [props.openAppointmentId]);
+  }
 
-  React.useEffect(() => {
+  const [seenOpenNew, setSeenOpenNew] = React.useState(props.openNew);
+  if (seenOpenNew !== props.openNew) {
+    setSeenOpenNew(props.openNew);
     if (props.openNew) {
       setEditing(null);
       setModalOpen(true);
     }
-  }, [props.openNew]);
+  }
 
-  React.useEffect(() => {
+  // Нові дані з сервера — оптимістичні правки більше не потрібні.
+  const [seenAppointments, setSeenAppointments] = React.useState(props.appointments);
+  if (seenAppointments !== props.appointments) {
+    setSeenAppointments(props.appointments);
     setOptimistic({});
-  }, [props.appointments]);
+  }
 
   const appointments = React.useMemo(
     () =>

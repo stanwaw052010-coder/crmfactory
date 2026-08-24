@@ -120,6 +120,18 @@ export async function requirePermission(permission: Permission): Promise<AuthCon
   return ctx;
 }
 
+/**
+ * Для сторінок: якщо права немає — повертаємо користувача на головну.
+ * Кидати помилку тут не можна: він побачив би загальний екран «Щось пішло не
+ * так» замість зрозумілої поведінки. Серверні дії натомість використовують
+ * `requirePermission()`, який кидає і перетворюється на повідомлення.
+ */
+export async function requireViewPermission(permission: Permission): Promise<AuthContext> {
+  const ctx = await requireAuth();
+  if (!ctx.permissions.has(permission)) redirect("/dashboard");
+  return ctx;
+}
+
 export async function requireSuperAdmin(): Promise<SessionUser> {
   const user = await getCurrentUser();
   if (!user) redirect("/login");

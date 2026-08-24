@@ -15,26 +15,45 @@ export function applyTheme(theme: Theme) {
   document.documentElement.classList.toggle("dark", dark);
 }
 
+const THEME_EVENT = "crmf:theme-change";
+
+function subscribeTheme(onChange: () => void) {
+  const media = window.matchMedia("(prefers-color-scheme: dark)");
+  const onMediaChange = () => {
+    // Системна тема змінилась — застосовуємо її, лише якщо користувач
+    // не обрав конкретну тему вручну.
+    if (readTheme() === "system") applyTheme("system");
+    onChange();
+  };
+  window.addEventListener(THEME_EVENT, onChange);
+  window.addEventListener("storage", onChange);
+  media.addEventListener("change", onMediaChange);
+  return () => {
+    window.removeEventListener(THEME_EVENT, onChange);
+    window.removeEventListener("storage", onChange);
+    media.removeEventListener("change", onMediaChange);
+  };
+}
+
+function readTheme(): Theme {
+  try {
+    return (localStorage.getItem(STORAGE_KEY) as Theme | null) ?? "system";
+  } catch {
+    return "system";
+  }
+}
+
 export function useTheme() {
-  const [theme, setThemeState] = React.useState<Theme>("system");
-
-  React.useEffect(() => {
-    const stored = (localStorage.getItem(STORAGE_KEY) as Theme | null) ?? "system";
-    setThemeState(stored);
-    applyTheme(stored);
-
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => {
-      if ((localStorage.getItem(STORAGE_KEY) as Theme | null) === "system") applyTheme("system");
-    };
-    media.addEventListener("change", onChange);
-    return () => media.removeEventListener("change", onChange);
-  }, []);
+  const theme = React.useSyncExternalStore(subscribeTheme, readTheme, () => "system" as Theme);
 
   const setTheme = React.useCallback((next: Theme) => {
-    localStorage.setItem(STORAGE_KEY, next);
-    setThemeState(next);
+    try {
+      localStorage.setItem(STORAGE_KEY, next);
+    } catch {
+      /* приватний режим — тема просто не запам'ятається */
+    }
     applyTheme(next);
+    window.dispatchEvent(new Event(THEME_EVENT));
   }, []);
 
   return { theme, setTheme };

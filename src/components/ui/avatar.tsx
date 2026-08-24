@@ -27,8 +27,10 @@ export function Avatar({
   const background = color ?? colorFromString(name);
 
   if (src) {
-    // eslint-disable-next-line @next/next/no-img-element
+    // Аватари приходять із довільних доменів (логотипи, фото команди),
+    // тому next/image з його білим списком доменів тут не підходить.
     return (
+      // eslint-disable-next-line @next/next/no-img-element
       <img
         src={src}
         alt={name}

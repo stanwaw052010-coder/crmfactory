@@ -10,6 +10,7 @@ import { SubmitButton } from "@/components/shared/submit-button";
 import { useToast } from "@/components/ui/toast";
 import { CLIENT_STATUS_LABELS } from "@/components/shared/status";
 import { createClientAction, updateClientAction } from "@/server/actions/clients";
+import type { ActionResult } from "@/lib/errors";
 import type { ClientStatus } from "@prisma/client";
 
 export type ClientFormValues = {
@@ -41,25 +42,34 @@ export function ClientModal({
 }) {
   const toast = useToast();
   const isEdit = Boolean(client?.id);
-  const action = isEdit ? updateClientAction.bind(null, client!.id!) : createClientAction;
-  const [state, formAction] = useActionState(action, null);
   const [marketing, setMarketing] = React.useState(client?.marketingOptIn ?? false);
 
-  React.useEffect(() => {
-    if (open) setMarketing(client?.marketingOptIn ?? false);
-  }, [open, client]);
+  // Реакція на результат — усередині самої дії, а не в ефекті:
+  // так тост і закриття гарантовано трапляються рівно один раз на відправку.
+  const [state, formAction] = useActionState(
+    async (prev: ActionResult<{ id: string }> | null, formData: FormData) => {
+      const result = isEdit
+        ? await updateClientAction(client!.id!, prev, formData)
+        : await createClientAction(prev, formData);
 
-  React.useEffect(() => {
-    if (!state) return;
-    if (state.ok) {
-      toast.success(isEdit ? "Дані клієнта оновлено" : "Клієнта додано");
-      onSaved(state.data.id);
-      onClose();
-    } else if (!state.fieldErrors) {
-      toast.error("Не вдалося зберегти", state.error);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state]);
+      if (result.ok) {
+        toast.success(isEdit ? "Дані клієнта оновлено" : "Клієнта додано");
+        onSaved(result.data.id);
+        onClose();
+      } else if (!result.fieldErrors) {
+        toast.error("Не вдалося зберегти", result.error);
+      }
+      return result;
+    },
+    null,
+  );
+
+  // Скидання форми при відкритті — під час рендеру, без ефекту.
+  const [wasOpen, setWasOpen] = React.useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
+    if (open) setMarketing(client?.marketingOptIn ?? false);
+  }
 
   const errors = state && !state.ok ? state.fieldErrors : undefined;
 

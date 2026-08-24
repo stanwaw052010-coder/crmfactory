@@ -23,7 +23,7 @@ export function AppointmentsChart({
   return (
     <div style={{ height }} className="w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -18 }} barCategoryGap="28%">
+        <BarChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }} barCategoryGap="28%">
           <CartesianGrid stroke={theme.grid} strokeDasharray="3 3" vertical={false} />
           <XAxis
             dataKey="date"
@@ -37,7 +37,7 @@ export function AppointmentsChart({
             tick={{ fill: theme.axis, fontSize: 11.5 }}
             tickLine={false}
             axisLine={false}
-            width={40}
+            width={36}
             allowDecimals={false}
           />
           <Tooltip

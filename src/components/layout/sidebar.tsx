@@ -34,20 +34,40 @@ export type SidebarProps = {
 };
 
 const STORAGE_KEY = "crmf-sidebar-collapsed";
+const SIDEBAR_EVENT = "crmf:sidebar-toggle";
+
+function subscribeSidebar(onChange: () => void) {
+  window.addEventListener(SIDEBAR_EVENT, onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    window.removeEventListener(SIDEBAR_EVENT, onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+
+function readCollapsed() {
+  try {
+    return localStorage.getItem(STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 export function Sidebar(props: SidebarProps) {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = React.useState(false);
-
-  React.useEffect(() => {
-    setCollapsed(localStorage.getItem(STORAGE_KEY) === "1");
-  }, []);
+  const collapsed = React.useSyncExternalStore(
+    subscribeSidebar,
+    readCollapsed,
+    () => false,
+  );
 
   const toggle = () => {
-    setCollapsed((prev) => {
-      localStorage.setItem(STORAGE_KEY, prev ? "0" : "1");
-      return !prev;
-    });
+    try {
+      localStorage.setItem(STORAGE_KEY, collapsed ? "0" : "1");
+    } catch {
+      /* приватний режим — стан не запам'ятається, але UI працює */
+    }
+    window.dispatchEvent(new Event(SIDEBAR_EVENT));
   };
 
   const items = NAV_ITEMS.filter((item) => props.permissions.includes(item.permission));
