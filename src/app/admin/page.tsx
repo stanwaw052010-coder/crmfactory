@@ -1,19 +1,18 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Building2, CalendarCheck2, TrendingUp, Users } from "lucide-react";
 import { requireSuperAdmin } from "@/lib/auth/context";
 import { prisma } from "@/lib/db/prisma";
 import { Card, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Avatar } from "@/components/ui/avatar";
 import { StatCard } from "@/components/shared/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatMoney } from "@/lib/money";
-import { addDays, formatDateUk, relativeUk } from "@/lib/time";
+import { PLAN_PRICE_CENTS } from "@/lib/plans";
+import { OrganizationsTable } from "@/features/admin/organizations-table";
+import { addDays, relativeUk } from "@/lib/time";
 
 export const metadata: Metadata = { title: "Super Admin" };
 
-const PLAN_PRICES: Record<string, number> = { FREE: 0, STARTER: 1900, BUSINESS: 3900, PRO: 7900 };
+
 
 export default async function AdminPage() {
   await requireSuperAdmin();
@@ -31,12 +30,21 @@ export default async function AdminPage() {
     prisma.organization.count(),
     prisma.user.count(),
     prisma.appointment.count(),
-    prisma.subscription.groupBy({ by: ["plan"], _count: { _all: true } }),
+    prisma.subscription.groupBy({
+      by: ["plan"],
+      _count: { _all: true },
+      _sum: { priceCents: true },
+    }),
     prisma.organization.findMany({
       orderBy: { createdAt: "desc" },
-      take: 12,
+      take: 25,
       include: {
-        subscription: { select: { plan: true, status: true } },
+        subscription: { select: { plan: true, status: true, trialEndsAt: true } },
+        memberships: {
+          where: { role: "OWNER" },
+          take: 1,
+          select: { user: { select: { email: true } } },
+        },
         _count: { select: { memberships: true, clients: true, appointments: true } },
       },
     }),
@@ -51,11 +59,9 @@ export default async function AdminPage() {
     }),
   ]);
 
-  // MRR рахуємо з платних підписок за прайсом тарифів.
-  const mrrCents = subscriptions.reduce(
-    (sum, row) => sum + (PLAN_PRICES[row.plan] ?? 0) * row._count._all,
-    0,
-  );
+  // MRR — сума реальних цін підписок, а не прайс-лист помножений на кількість.
+  // Безкоштовний Pro, виданий на тест, має priceCents = 0 і виручку не роздуває.
+  const mrrCents = subscriptions.reduce((sum, row) => sum + (row._sum.priceCents ?? 0), 0);
 
   return (
     <div className="mx-auto max-w-[1300px]">
@@ -91,7 +97,7 @@ export default async function AdminPage() {
                 {row?._count._all ?? 0}
               </p>
               <p className="mt-0.5 text-[11.5px] text-[var(--fg-subtle)]">
-                {formatMoney(PLAN_PRICES[plan], "EUR")}/міс
+                {formatMoney(PLAN_PRICE_CENTS[plan], "EUR")}/міс
               </p>
             </div>
           );
@@ -99,68 +105,22 @@ export default async function AdminPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-        <Card className="overflow-hidden">
-          <CardHeader title="Організації" description="Останні зареєстровані бізнеси" />
-          {recentOrganizations.length === 0 ? (
-            <EmptyState icon={Building2} title="Організацій ще немає" />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] text-left">
-                <thead>
-                  <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
-                    {["Бізнес", "Тариф", "Команда", "Клієнти", "Записи", "Створено"].map((label) => (
-                      <th
-                        key={label}
-                        className="px-4 py-3 text-[11.5px] font-semibold tracking-wide text-[var(--fg-subtle)] uppercase"
-                      >
-                        {label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--border)]">
-                  {recentOrganizations.map((organization) => (
-                    <tr key={organization.id} className="transition-colors hover:bg-[var(--surface-hover)]">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2.5">
-                          <Avatar name={organization.name} src={organization.logoUrl} size="sm" />
-                          <div className="min-w-0">
-                            <p className="truncate text-[13.5px] font-medium text-[var(--fg)]">
-                              {organization.name}
-                            </p>
-                            <Link
-                              href={`/book/${organization.slug}`}
-                              className="truncate text-[11.5px] text-[var(--fg-subtle)] hover:text-[var(--primary)]"
-                            >
-                              /book/{organization.slug}
-                            </Link>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge tone={organization.subscription?.plan === "FREE" ? "neutral" : "brand"}>
-                          {organization.subscription?.plan ?? "FREE"}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-[13px] text-[var(--fg-muted)] tabular-nums">
-                        {organization._count.memberships}
-                      </td>
-                      <td className="px-4 py-3 text-[13px] text-[var(--fg-muted)] tabular-nums">
-                        {organization._count.clients}
-                      </td>
-                      <td className="px-4 py-3 text-[13px] text-[var(--fg-muted)] tabular-nums">
-                        {organization._count.appointments}
-                      </td>
-                      <td className="px-4 py-3 text-[12.5px] text-[var(--fg-subtle)]">
-                        {formatDateUk(organization.createdAt)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
+        <OrganizationsTable
+          organizations={recentOrganizations.map((organization) => ({
+            id: organization.id,
+            name: organization.name,
+            slug: organization.slug,
+            logoUrl: organization.logoUrl,
+            createdAt: organization.createdAt,
+            plan: organization.subscription?.plan ?? "FREE",
+            status: organization.subscription?.status ?? "TRIALING",
+            trialEndsAt: organization.subscription?.trialEndsAt ?? null,
+            ownerEmail: organization.memberships[0]?.user.email ?? null,
+            members: organization._count.memberships,
+            clients: organization._count.clients,
+            appointments: organization._count.appointments,
+          }))}
+        />
 
         <Card>
           <CardHeader title="Системний журнал" description="Останні дії в платформі" />
