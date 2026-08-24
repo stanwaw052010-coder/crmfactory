@@ -172,11 +172,16 @@ prisma/
 ### Vercel + керований Postgres (Neon / Supabase / Vercel Postgres)
 
 1. Import Project → оберіть репозиторій.
-2. **Root Directory:** `crm-factory`.
-3. **Build Command:** `npm run build:deploy` — на відміну від звичайного
-   `build`, він ще й накочує міграції (`prisma migrate deploy`).
-4. Додайте змінні з таблиці вище.
-5. Deploy.
+2. **Root Directory:** `crm-factory` — єдина настройка, яку треба змінити
+   вручну. Команду збірки Vercel візьме з `crm-factory/vercel.json`
+   (`npm run build:deploy` — генерація клієнта, міграції, збірка).
+3. Додайте змінні з таблиці вище.
+4. Deploy.
+
+Демо-дані в продакшні не потрібні: відкрийте свій домен, натисніть
+«Спробувати безкоштовно» — і зареєструйте власний workspace через
+звичайну форму. Якщо email збігається з `SUPER_ADMIN_EMAIL`, ви одразу
+отримаєте доступ і до `/admin`.
 
 Після першого деплою наповніть базу demo-даними (необов'язково):
 
