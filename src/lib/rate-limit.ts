@@ -42,6 +42,8 @@ export function consume(key: string, limit: number, windowSec: number): RateLimi
 export const LIMITS = {
   login: { limit: 8, windowSec: 300 },
   register: { limit: 5, windowSec: 3600 },
+  passwordReset: { limit: 5, windowSec: 900 },
+  recovery: { limit: 5, windowSec: 3600 },
   booking: { limit: 10, windowSec: 600 },
   search: { limit: 120, windowSec: 60 },
 } as const;

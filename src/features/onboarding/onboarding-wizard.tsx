@@ -197,7 +197,7 @@ export function OnboardingWizard({
             {step === 0 && (
               <div className="space-y-5">
                 <Header
-                  title={`Вітаємо в crm.factory, ${userName.split(" ")[0]} 🚀`}
+                  title={`Вітаємо в crm.factory, ${userName.split(" ")[0]}`}
                   description={`Налаштуємо «${organizationName}» за 5 кроків. Усе можна змінити пізніше.`}
                 />
                 <Field label="Сфера бізнесу" hint="підставимо типові послуги">

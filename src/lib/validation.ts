@@ -291,6 +291,42 @@ export const passwordChangeSchema = z
     path: ["confirmPassword"],
   });
 
+/** Пароль, який задають без знання попереднього (відновлення / аварійний доступ). */
+const newPasswordSchema = z
+  .string()
+  .min(8, "Мінімум 8 символів")
+  .max(128, "Задовгий пароль")
+  .regex(/[a-zA-Zа-яА-ЯіїєґІЇЄҐ]/, "Додайте літеру")
+  .regex(/\d/, "Додайте цифру");
+
+export const forgotPasswordSchema = z.object({
+  email: emailSchema,
+});
+
+export const resetPasswordSchema = z
+  .object({
+    token: z.string().min(1, "Посилання неповне").max(200),
+    password: newPasswordSchema,
+    confirmPassword: z.string(),
+  })
+  .refine((v) => v.password === v.confirmPassword, {
+    message: "Паролі не збігаються",
+    path: ["confirmPassword"],
+  });
+
+/** Аварійне відновлення доступу власника платформи за ключем із env. */
+export const recoverySchema = z
+  .object({
+    email: emailSchema,
+    key: z.string().min(1, "Введіть ключ відновлення").max(200),
+    password: newPasswordSchema,
+    confirmPassword: z.string(),
+  })
+  .refine((v) => v.password === v.confirmPassword, {
+    message: "Паролі не збігаються",
+    path: ["confirmPassword"],
+  });
+
 // ── Онлайн-запис (публічна форма) ────────────────────────────────────────────
 
 export const publicBookingSchema = z.object({

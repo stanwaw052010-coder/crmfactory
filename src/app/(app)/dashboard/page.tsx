@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { requireAuth, ownEmployeeFilter } from "@/lib/auth/context";
 import { getDashboardData, getRevenueSeries } from "@/server/queries/dashboard";
+import { AnimatedMoney, AnimatedNumber } from "@/components/shared/animated-number";
 import { StatCard } from "@/components/shared/stat-card";
 import { Card, CardHeader, CardBody } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,8 +37,9 @@ export default async function DashboardPage() {
     <div className="mx-auto max-w-[1400px]">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-[24px] leading-tight font-semibold tracking-tight text-[var(--fg)]">
-            {greetingUk()}, {ctx.user.name.split(" ")[0]} 👋
+          <h1 className="text-[25px] leading-tight font-semibold tracking-[-0.03em] text-[var(--fg)]">
+            {greetingUk()},{" "}
+            <span className="text-[var(--primary)]">{ctx.user.name.split(" ")[0]}</span>
           </h1>
           <p className="mt-1.5 text-[13.5px] text-[var(--fg-muted)]">
             Сьогодні, {formatDateUk(new Date(), { weekday: true })}
@@ -98,10 +100,10 @@ async function DashboardContent() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="stagger grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Записів сьогодні"
-          value={stats.todayCount}
+          value={<AnimatedNumber value={stats.todayCount} />}
           delta={deltaPercent(stats.todayCount, stats.yesterdayCount)}
           hint="проти вчора"
           icon={CalendarCheck2}
@@ -109,7 +111,7 @@ async function DashboardContent() {
         />
         <StatCard
           label="Нових клієнтів"
-          value={stats.newClientsWeek}
+          value={<AnimatedNumber value={stats.newClientsWeek} />}
           delta={deltaPercent(stats.newClientsWeek, stats.newClientsPrevWeek)}
           hint="за 7 днів"
           icon={Users}
@@ -117,7 +119,7 @@ async function DashboardContent() {
         />
         <StatCard
           label="Виручка сьогодні"
-          value={formatMoney(stats.revenueTodayCents, currency)}
+          value={<AnimatedMoney cents={stats.revenueTodayCents} currency={currency} />}
           delta={deltaPercent(stats.revenueTodayCents, stats.revenueYesterdayCents)}
           hint="проти вчора"
           icon={Wallet}
@@ -125,7 +127,7 @@ async function DashboardContent() {
         />
         <StatCard
           label="Скасування"
-          value={stats.cancelledToday}
+          value={<AnimatedNumber value={stats.cancelledToday} />}
           delta={deltaPercent(stats.cancelledToday, stats.cancelledYesterday)}
           hint="сьогодні"
           icon={CalendarX2}

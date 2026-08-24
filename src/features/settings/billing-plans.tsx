@@ -152,7 +152,7 @@ export function BillingPlans({
         </CardBody>
       </Card>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="stagger grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {PLAN_ORDER.map((item) => {
           const current = item === plan;
           const highlight = item === "BUSINESS";

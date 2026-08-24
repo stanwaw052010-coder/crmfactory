@@ -82,6 +82,7 @@ export function Field({
   children,
   className,
   htmlFor,
+  action,
 }: {
   label?: string;
   hint?: string;
@@ -89,16 +90,25 @@ export function Field({
   children: React.ReactNode;
   className?: string;
   htmlFor?: string;
+  /** Дія праворуч від лейбла — наприклад «Забули пароль?». */
+  action?: React.ReactNode;
 }) {
   return (
     <div className={cn("space-y-1.5", className)}>
-      {label && (
-        <Label htmlFor={htmlFor} hint={hint}>
-          {label}
-        </Label>
+      {(label || action) && (
+        <div className="flex items-center justify-between gap-3">
+          {label ? (
+            <Label htmlFor={htmlFor} hint={hint}>
+              {label}
+            </Label>
+          ) : (
+            <span />
+          )}
+          {action}
+        </div>
       )}
       {children}
-      {error && <p className="text-[12px] text-[var(--danger)]">{error}</p>}
+      {error && <p className="animate-fade-up text-[12px] text-[var(--danger)]">{error}</p>}
     </div>
   );
 }

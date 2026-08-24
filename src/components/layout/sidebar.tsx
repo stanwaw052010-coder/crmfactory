@@ -119,22 +119,36 @@ export function Sidebar(props: SidebarProps) {
               href={item.href}
               className={cn(
                 "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13.5px] font-medium",
-                "transition-colors duration-150",
+                "transition-[background,color] duration-150 ease-[var(--ease-out-expo)]",
                 collapsed && "justify-center px-0",
                 active
-                  ? "bg-[var(--primary-soft)] text-[var(--primary)]"
+                  ? "text-[var(--primary)]"
                   : "text-[var(--fg-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]",
               )}
             >
+              {/* Підкладка активного пункту їде між кнопками, а не зникає
+                  і з'являється — рух підказує, звідки й куди ви перейшли. */}
+              {active && (
+                <motion.span
+                  layoutId="nav-active-bg"
+                  className="absolute inset-0 rounded-xl bg-[var(--primary-soft)]"
+                  transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                />
+              )}
               {active && (
                 <motion.span
                   layoutId="nav-active"
                   className="absolute top-1/2 left-0 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-[var(--primary)]"
-                  transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                  transition={{ type: "spring", stiffness: 420, damping: 34 }}
                 />
               )}
-              <Icon className="h-[18px] w-[18px] shrink-0" />
-              {!collapsed && <span className="truncate">{item.label}</span>}
+              <Icon
+                className={cn(
+                  "relative h-[18px] w-[18px] shrink-0 transition-transform duration-200 ease-[var(--ease-spring)]",
+                  !active && "group-hover:scale-110",
+                )}
+              />
+              {!collapsed && <span className="relative truncate">{item.label}</span>}
             </Link>
           );
 

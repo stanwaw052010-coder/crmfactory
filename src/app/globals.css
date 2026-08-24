@@ -41,10 +41,19 @@
   --radius-card: 16px;
   --radius-panel: 18px;
 
-  --shadow-soft: 0 1px 2px rgb(15 23 42 / 0.04), 0 4px 16px -4px rgb(15 23 42 / 0.08);
-  --shadow-lift: 0 2px 4px rgb(15 23 42 / 0.04), 0 12px 32px -8px rgb(15 23 42 / 0.14);
-  --shadow-pop: 0 24px 60px -12px rgb(15 23 42 / 0.24);
+  /* Тіні з домішкою синього, а не нейтрально-сірі: інтерфейс перестає
+     виглядати «намальованим за замовчуванням» і набуває власного тону. */
+  --shadow-soft: 0 1px 2px rgb(20 40 90 / 0.05), 0 4px 16px -4px rgb(20 40 90 / 0.08);
+  --shadow-lift: 0 2px 4px rgb(20 40 90 / 0.05), 0 14px 34px -10px rgb(20 40 90 / 0.16);
+  --shadow-pop: 0 28px 64px -16px rgb(20 40 90 / 0.26);
   --shadow-brand: 0 8px 24px -8px rgb(37 99 235 / 0.5);
+  --shadow-glow: 0 0 0 1px rgb(37 99 235 / 0.12), 0 12px 32px -10px rgb(37 99 235 / 0.32);
+
+  /* Криві руху. `spring` має легкий перескок — саме він відрізняє
+     «щось поїхало» від «щось ожило». */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-soft: cubic-bezier(0.65, 0, 0.35, 1);
 
   --animate-in: fade-in 0.18s ease-out;
 }
@@ -161,10 +170,14 @@ body {
   background: color-mix(in oklab, var(--primary) 22%, transparent);
 }
 
+/* Контрастний контур лишається (це доступність), але додається м'яке
+   світіння — фокус перестає виглядати як службова рамка браузера. */
 :focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
   border-radius: 6px;
+  box-shadow: 0 0 0 6px color-mix(in oklab, var(--ring) 12%, transparent);
+  transition: box-shadow 0.16s var(--ease-out-expo);
 }
 
 /* Тонкі скролбари — без візуального шуму */
@@ -226,6 +239,105 @@ body {
   }
 }
 
+/* ── Фактури ───────────────────────────────────────────────────────────
+   Три шари «характеру», які відрізняють інтерфейс від згенерованого за
+   замовчуванням: зерно, технічна сітка та світловий градієнт бренду.
+   Усі три — чисто декоративні (pointer-events: none у місці застосування).
+   ─────────────────────────────────────────────────────────────────────── */
+
+/* Плівкове зерно: прибирає «пластиковість» великих темних площин. */
+@utility grain {
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.035;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+}
+
+/* Креслярська сітка — відсилання до «factory» у назві продукту. */
+@utility blueprint {
+  background-image:
+    linear-gradient(color-mix(in oklab, var(--fg) 5%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklab, var(--fg) 5%, transparent) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+@utility dot-grid {
+  background-image: radial-gradient(
+    color-mix(in oklab, var(--fg) 12%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: 22px 22px;
+}
+
+/* ── Інтерактивність ───────────────────────────────────────────────────── */
+
+/* Картка, яка реагує на курсор: підйом + світіння у колір бренду. */
+@utility card-interactive {
+  transition:
+    transform 0.22s var(--ease-out-expo),
+    box-shadow 0.22s var(--ease-out-expo),
+    border-color 0.22s var(--ease-out-expo);
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-glow);
+    border-color: color-mix(in oklab, var(--primary) 30%, var(--border));
+  }
+  &:active {
+    transform: translateY(0);
+    transition-duration: 0.08s;
+  }
+}
+
+/* Світловий відблиск, що пробігає по кнопці на hover. */
+@utility sheen {
+  position: relative;
+  overflow: hidden;
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      105deg,
+      transparent 35%,
+      rgb(255 255 255 / 0.22) 50%,
+      transparent 65%
+    );
+    transform: translateX(-120%);
+    transition: transform 0.55s var(--ease-out-expo);
+  }
+  &:hover::before {
+    transform: translateX(120%);
+  }
+}
+
+/* Підкреслення, що «домальовується» зліва направо. */
+@utility underline-grow {
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    height: 1.5px;
+    width: 100%;
+    border-radius: 999px;
+    background: currentColor;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.28s var(--ease-out-expo);
+  }
+  &:hover::after {
+    transform: scaleX(1);
+  }
+}
+
 /* ── Анімації (короткі: 150–300ms) ─────────────────────────────────────── */
 
 @keyframes fade-in {
@@ -257,11 +369,56 @@ body {
   50% { opacity: 0.45; transform: scale(0.85); }
 }
 
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Повільний дрейф світлових плям — фон живе, але не відволікає. */
+@keyframes drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  33% { transform: translate3d(3%, -4%, 0) scale(1.06); }
+  66% { transform: translate3d(-3%, 3%, 0) scale(0.96); }
+}
+
+/* Розхідне кільце — для індикатора «прямо зараз». */
+@keyframes ring-out {
+  0% { opacity: 0.5; transform: scale(1); }
+  100% { opacity: 0; transform: scale(2.4); }
+}
+
 .animate-fade-in { animation: fade-in 0.18s ease-out both; }
-.animate-fade-up { animation: fade-up 0.24s cubic-bezier(0.16, 1, 0.3, 1) both; }
-.animate-scale-in { animation: scale-in 0.18s cubic-bezier(0.16, 1, 0.3, 1) both; }
-.animate-slide-left { animation: slide-left 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-fade-up { animation: fade-up 0.24s var(--ease-out-expo) both; }
+.animate-scale-in { animation: scale-in 0.18s var(--ease-out-expo) both; }
+.animate-slide-left { animation: slide-left 0.22s var(--ease-out-expo) both; }
 .animate-pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+.animate-rise-in { animation: rise-in 0.32s var(--ease-out-expo) both; }
+.animate-drift { animation: drift 22s ease-in-out infinite; }
+.animate-ring-out { animation: ring-out 2s ease-out infinite; }
+
+/**
+ * Каскадна поява дітей.
+ *
+ * Сітка карток, що з'являється одночасно, читається як «намальовано»;
+ * та сама сітка з кроком у 40 мс читається як «зібралося». Затримки
+ * задані статично до 12-го елемента — далі каскад не потрібен, бо
+ * решта все одно нижче краю екрана.
+ */
+.stagger > * {
+  animation: rise-in 0.34s var(--ease-out-expo) both;
+}
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 40ms; }
+.stagger > *:nth-child(3) { animation-delay: 80ms; }
+.stagger > *:nth-child(4) { animation-delay: 120ms; }
+.stagger > *:nth-child(5) { animation-delay: 160ms; }
+.stagger > *:nth-child(6) { animation-delay: 200ms; }
+.stagger > *:nth-child(7) { animation-delay: 240ms; }
+.stagger > *:nth-child(8) { animation-delay: 280ms; }
+.stagger > *:nth-child(9) { animation-delay: 320ms; }
+.stagger > *:nth-child(10) { animation-delay: 360ms; }
+.stagger > *:nth-child(11) { animation-delay: 400ms; }
+.stagger > *:nth-child(n + 12) { animation-delay: 440ms; }
 
 /* Skeleton із «пробігаючим» відблиском */
 .skeleton {

@@ -65,8 +65,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           canCreateAppointment={ctx.permissions.has("appointment.create")}
         />
 
-        <main className="min-w-0 flex-1 px-4 pt-6 pb-24 sm:px-6 md:pb-10">
-          <PageTransition>{children}</PageTransition>
+        {/* Ледь помітна крапкова сітка на тлі: білі картки лежать на
+            фактурі, а не на рівній заливці. На око майже непомітно —
+            але площина перестає читатися як порожня. */}
+        <main className="relative min-w-0 flex-1 px-4 pt-6 pb-24 sm:px-6 md:pb-10">
+          <div
+            aria-hidden
+            className="dot-grid pointer-events-none absolute inset-0 opacity-[0.45] [mask-image:linear-gradient(to_bottom,black,transparent_70%)]"
+          />
+          <div className="relative">
+            <PageTransition>{children}</PageTransition>
+          </div>
         </main>
       </div>
 

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Card, CardHeader, CardBody } from "@/components/ui/card";
 import { SegmentedControl } from "@/components/ui/tabs";
+import { AnimatedMoney, AnimatedNumber } from "@/components/shared/animated-number";
 import { StatCard } from "@/components/shared/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RevenueChart } from "@/components/charts/revenue-chart";
@@ -64,10 +65,10 @@ export function AnalyticsView({
         </Card>
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="stagger grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard
               label="Виручка"
-              value={formatMoney(totals.revenueCents, currency)}
+              value={<AnimatedMoney cents={totals.revenueCents} currency={currency} />}
               delta={deltaPercent(totals.revenueCents, totals.prevRevenueCents)}
               hint="проти попереднього періоду"
               icon={Wallet}
@@ -75,7 +76,7 @@ export function AnalyticsView({
             />
             <StatCard
               label="Записів"
-              value={totals.appointments}
+              value={<AnimatedNumber value={totals.appointments} />}
               delta={deltaPercent(totals.appointments, totals.prevAppointments)}
               hint="проти попереднього періоду"
               icon={CalendarCheck2}
@@ -83,7 +84,7 @@ export function AnalyticsView({
             />
             <StatCard
               label="Нових клієнтів"
-              value={totals.newClients}
+              value={<AnimatedNumber value={totals.newClients} />}
               delta={deltaPercent(totals.newClients, totals.prevNewClients)}
               hint={`${totals.returningClients} повторних`}
               icon={UserPlus}
@@ -91,7 +92,7 @@ export function AnalyticsView({
             />
             <StatCard
               label="Середній чек"
-              value={formatMoney(totals.averageCheckCents, currency)}
+              value={<AnimatedMoney cents={totals.averageCheckCents} currency={currency} />}
               delta={deltaPercent(totals.averageCheckCents, totals.prevAverageCheckCents)}
               hint="проти попереднього періоду"
               icon={Receipt}
@@ -129,7 +130,7 @@ export function AnalyticsView({
             </Card>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="stagger grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard
               label="Рівень скасувань"
               value={`${totals.cancellationRate}%`}

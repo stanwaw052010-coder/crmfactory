@@ -7,3 +7,7 @@ build/
 *.tsbuildinfo
 next-env.d.ts
 .DS_Store
+
+# Автогенеровані Next.js файли для AI-агентів
+AGENTS.md
+CLAUDE.md

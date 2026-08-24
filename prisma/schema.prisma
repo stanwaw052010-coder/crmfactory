@@ -35,6 +35,7 @@ model User {
 
   memberships         Membership[]
   sessions            Session[]
+  passwordResets      PasswordResetToken[]
   notifications       Notification[]
   auditLogs           AuditLog[]
   clientNotes         ClientNote[]
@@ -53,6 +54,24 @@ model Session {
   userAgent String?
   ip        String?
   createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// Одноразовий токен відновлення пароля.
+/// У базі лежить лише SHA-256 хеш — навіть маючи дамп БД, відновити
+/// посилання неможливо. Токен живе 60 хвилин і згорає після використання.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  ip        String?
+  createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
