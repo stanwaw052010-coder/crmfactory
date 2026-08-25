@@ -7,6 +7,14 @@ import { appUrl } from "@/lib/app-url";
 import { wallClockToUtc } from "@/lib/wall-clock";
 import { formatMoney } from "@/lib/money";
 
+/** Показуємо в логах, кому пішов лист, не виписуючи адресу цілком. */
+function maskEmail(email: string): string {
+  const at = email.indexOf("@");
+  if (at < 1) return "***";
+  const name = email.slice(0, at);
+  return `${name.slice(0, 2)}***${email.slice(at)}`;
+}
+
 /**
  * Лист-підтвердження після онлайн-запису.
  *
@@ -15,11 +23,21 @@ import { formatMoney } from "@/lib/money";
  * уточнити. Лист закриває це питання і заразом кладе візит у календар
  * клієнта вкладеним .ics.
  *
+ * `to` — адреса, введена САМЕ В ЦЬОМУ бронюванні, і вона має перевагу над
+ * адресою в картці клієнта. Причина: клієнта знаходять за телефоном, і
+ * якщо в картці вже лежить стара пошта (записував адміністратор, змінилася
+ * адреса, телефон спільний на родину), лист пішов би не тому, хто щойно
+ * заповнив форму. Саму картку при цьому не переписуємо: публічна форма не
+ * повинна мовчки правити дані, які веде салон.
+ *
  * НІКОЛИ не кидає виняток. Запис уже створено; невдала пошта не має
  * скасовувати бронювання чи показувати клієнту помилку. Той самий принцип,
  * що й в автоматизаціях: побічна дія не ламає основну.
  */
-export async function sendAppointmentConfirmation(appointmentId: string): Promise<void> {
+export async function sendAppointmentConfirmation(
+  appointmentId: string,
+  options?: { to?: string | null },
+): Promise<void> {
   try {
     const appointment = await prisma.appointment.findUnique({
       where: { id: appointmentId },
@@ -46,8 +64,12 @@ export async function sendAppointmentConfirmation(appointmentId: string): Promis
       },
     });
 
-    const email = appointment?.client.email;
-    if (!appointment || !email) return;
+    const email = options?.to?.trim() || appointment?.client.email;
+    if (!appointment || !email) {
+      // Найчастіша причина «лист не прийшов» — його й не було кому слати.
+      console.log(`[booking] ${appointmentId}: підтвердження не надсилали — немає email`);
+      return;
+    }
 
     const { organization, service, employee, client } = appointment;
     const base = appUrl();
@@ -85,7 +107,7 @@ export async function sendAppointmentConfirmation(appointmentId: string): Promis
       url: `${base}/book/${organization.slug}`,
     });
 
-    await sendMail({
+    const result = await sendMail({
       to: email,
       ...mail,
       attachments: [
@@ -96,6 +118,14 @@ export async function sendAppointmentConfirmation(appointmentId: string): Promis
         },
       ],
     });
+
+    if (result.error) {
+      console.error(`[booking] підтвердження на ${maskEmail(email)} НЕ пішло: ${result.error}`);
+    } else if (result.channel === "log") {
+      console.warn(`[booking] підтвердження для ${maskEmail(email)} лише в лог — RESEND_API_KEY не задано`);
+    } else {
+      console.log(`[booking] підтвердження надіслано на ${maskEmail(email)}`);
+    }
   } catch (error) {
     console.error("[booking] не вдалося надіслати підтвердження", error);
   }

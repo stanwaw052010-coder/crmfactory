@@ -258,8 +258,9 @@ export async function createPublicBookingAction(
     });
 
     await scheduleAppointmentReminders(appointment.id);
-    // Клієнт залишив email — він чекає підтвердження, а не тиші.
-    await sendAppointmentConfirmation(appointment.id);
+    // Клієнт залишив email — він чекає підтвердження, а не тиші. Адресу
+    // передаємо саме з форми: у картці клієнта може лежати інша.
+    await sendAppointmentConfirmation(appointment.id, { to: parsed.email });
     // Запис з публічної сторінки — така сама подія, як створений у CRM.
     // Правило «онлайн-запис → сповістити адміністратора» саме про це.
     await runAutomations("APPOINTMENT_CREATED", {
