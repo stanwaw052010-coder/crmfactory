@@ -23,7 +23,25 @@ export function aiEnabled(): boolean {
 /** Скільки разів модель може сходити по дані, перш ніж відповісти. */
 const MAX_TOOL_ROUNDS = 6;
 
-const MODEL = "claude-opus-5";
+/**
+ * Модель асистента.
+ *
+ * За замовчуванням Opus 5 — найсильніша. Але для цієї задачі вона
+ * надлишкова: рахує не модель, а Postgres (інструменти повертають готові
+ * суми), і моделі лишається сформулювати відповідь українською. Тому
+ * значення виведене у змінну середовища — власник платформи може
+ * перемкнутися на дешевшу, не чіпаючи код.
+ *
+ * Ціни за мільйон токенів (вхід / вихід):
+ *   claude-opus-5      $5  / $25   — найточніша
+ *   claude-sonnet-5    $2  / $10   — компроміс
+ *   claude-haiku-4-5   $1  / $5    — вп'ятеро дешевша за Opus
+ */
+const DEFAULT_MODEL = "claude-opus-5";
+
+function model(): string {
+  return process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_MODEL;
+}
 
 function systemPrompt(params: { businessName: string; currency: string; today: string }) {
   return [
@@ -83,7 +101,7 @@ export async function askAssistant(params: {
   try {
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       const response = await client.messages.create({
-        model: MODEL,
+        model: model(),
         max_tokens: 4096,
         // Питання про бізнес майже завжди вимагають зіставити кілька
         // показників, тож адаптивне мислення тут доречне.
