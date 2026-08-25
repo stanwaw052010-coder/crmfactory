@@ -50,6 +50,10 @@ export function BusinessForm({
     currency: string;
     brandColor: string;
     logoUrl: string | null;
+    instagramUrl: string | null;
+    facebookUrl: string | null;
+    tiktokUrl: string | null;
+    mapsUrl: string | null;
   };
   canManage: boolean;
 }) {
@@ -105,6 +109,54 @@ export function BusinessForm({
           <Field label="Логотип" hint="посилання на зображення">
             <Input name="logoUrl" defaultValue={organization.logoUrl ?? ""} disabled={!canManage} placeholder="https://…" />
           </Field>
+
+          <Field
+            label="Посилання на карти"
+            hint="необов'язково — інакше зберемо з адреси"
+            error={errors?.mapsUrl}
+          >
+            <Input
+              name="mapsUrl"
+              defaultValue={organization.mapsUrl ?? ""}
+              disabled={!canManage}
+              placeholder="https://maps.app.goo.gl/…"
+            />
+          </Field>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title="Соцмережі"
+          description="Показуються клієнтам на сторінці онлайн-запису"
+        />
+        <CardBody className="space-y-4">
+          <Field label="Instagram" error={errors?.instagramUrl}>
+            <Input
+              name="instagramUrl"
+              defaultValue={organization.instagramUrl ?? ""}
+              disabled={!canManage}
+              placeholder="instagram.com/ваш_салон"
+            />
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Facebook" error={errors?.facebookUrl}>
+              <Input
+                name="facebookUrl"
+                defaultValue={organization.facebookUrl ?? ""}
+                disabled={!canManage}
+                placeholder="facebook.com/…"
+              />
+            </Field>
+            <Field label="TikTok" error={errors?.tiktokUrl}>
+              <Input
+                name="tiktokUrl"
+                defaultValue={organization.tiktokUrl ?? ""}
+                disabled={!canManage}
+                placeholder="tiktok.com/@…"
+              />
+            </Field>
+          </div>
         </CardBody>
       </Card>
 

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
+import { listMedia } from "@/server/media";
+import { venueMapUrl } from "@/lib/maps";
 import { BookingFlow } from "@/features/booking/booking-flow";
 
 type Params = Promise<{ slug: string }>;
@@ -37,12 +39,16 @@ export default async function PublicBookingPage({ params }: { params: Params }) 
       bookingRequireEmail: true,
       bookingWelcomeText: true,
       bookingHorizonDays: true,
+      instagramUrl: true,
+      facebookUrl: true,
+      tiktokUrl: true,
+      mapsUrl: true,
     },
   });
   if (!organization) notFound();
 
   // Публічно віддаємо лише те, що справді доступне для запису.
-  const [services, employees] = await Promise.all([
+  const [services, employees, gallery, hours] = await Promise.all([
     prisma.service.findMany({
       where: { organizationId: organization.id, isActive: true, onlineBooking: true },
       include: {
@@ -55,6 +61,12 @@ export default async function PublicBookingPage({ params }: { params: Params }) 
       where: { organizationId: organization.id, isActive: true, acceptsOnlineBooking: true },
       select: { id: true, name: true, position: true, color: true, avatarUrl: true, bio: true },
       orderBy: { name: "asc" },
+    }),
+    listMedia(organization.id, "GALLERY"),
+    prisma.businessHours.findMany({
+      where: { organizationId: organization.id },
+      select: { weekday: true, openMinute: true, closeMinute: true, isClosed: true },
+      orderBy: { weekday: "asc" },
     }),
   ]);
 
@@ -73,7 +85,13 @@ export default async function PublicBookingPage({ params }: { params: Params }) 
         requireEmail: organization.bookingRequireEmail,
         welcomeText: organization.bookingWelcomeText,
         horizonDays: organization.bookingHorizonDays,
+        instagramUrl: organization.instagramUrl,
+        facebookUrl: organization.facebookUrl,
+        tiktokUrl: organization.tiktokUrl,
+        mapUrl: venueMapUrl(organization),
       }}
+      gallery={gallery.map((photo) => ({ id: photo.id, url: photo.url }))}
+      hours={hours}
       services={services.map((service) => ({
         id: service.id,
         name: service.name,

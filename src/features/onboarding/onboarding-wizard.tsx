@@ -9,6 +9,7 @@ import {
   Building2,
   CalendarClock,
   Check,
+  Image as ImageIcon,
   Link2,
   Plus,
   Sparkles,
@@ -21,6 +22,7 @@ import { useToast } from "@/components/ui/toast";
 import { cn, slugify } from "@/lib/utils";
 import { CURRENCIES, currencySymbol, parseMoneyToCents } from "@/lib/money";
 import { minutesToTime, timeToMinutes, WEEKDAYS_SHORT_UK } from "@/lib/time";
+import { PhotoGallery, type GalleryPhoto } from "@/features/media/photo-gallery";
 import { completeOnboardingAction } from "@/server/actions/onboarding";
 
 const INDUSTRIES = [
@@ -45,6 +47,7 @@ const STEPS = [
   { key: "services", label: "Послуги", icon: Sparkles },
   { key: "team", label: "Команда", icon: UserRound },
   { key: "hours", label: "Графік", icon: CalendarClock },
+  { key: "place", label: "Про салон", icon: ImageIcon },
   { key: "booking", label: "Онлайн-запис", icon: Link2 },
 ];
 
@@ -84,6 +87,9 @@ export function OnboardingWizard({
   const [closeMinute, setCloseMinute] = React.useState(1080);
   const [workingDays, setWorkingDays] = React.useState<number[]>([1, 2, 3, 4, 5, 6]);
   const [slug, setSlug] = React.useState(defaultSlug);
+  const [address, setAddress] = React.useState("");
+  const [instagram, setInstagram] = React.useState("");
+  const [photos, setPhotos] = React.useState<GalleryPhoto[]>([]);
 
   // Зміна сфери підставляє типові послуги — але лише поки їх не редагували.
   const applyIndustry = (value: string) => {
@@ -105,13 +111,18 @@ export function OnboardingWizard({
     if (step === 1) return services.length > 0 && services.every((s) => s.name.trim().length > 0);
     if (step === 2) return employees.length > 0 && employees.every((e) => e.name.trim().length > 0);
     if (step === 3) return workingDays.length > 0 && closeMinute > openMinute;
-    if (step === 4) return slug.length >= 3;
+    // Крок «Про салон» пропускається без наслідків: фото й адресу можна
+    // додати пізніше в налаштуваннях, і затримувати старт цим не варто.
+    if (step === 4) return true;
+    if (step === 5) return slug.length >= 3;
     return true;
   }, [step, industry, services, employees, workingDays, openMinute, closeMinute, slug]);
 
   const finish = async () => {
     setSaving(true);
     const result = await completeOnboardingAction({
+      address: address.trim() || undefined,
+      instagramUrl: instagram.trim() || undefined,
       industry,
       timezone,
       currency,
@@ -424,6 +435,41 @@ export function OnboardingWizard({
             )}
 
             {step === 4 && (
+              <div className="space-y-6">
+                <Header
+                  title="Покажіть, куди приходити"
+                  description="Це побачать клієнти на сторінці запису. Усе можна пропустити й додати пізніше."
+                />
+
+                <div>
+                  <p className="mb-1 text-[13px] font-medium text-[var(--fg)]">
+                    Фото салону та майстрів
+                  </p>
+                  <p className="mb-3 text-[12.5px] text-[var(--fg-muted)]">
+                    Інтер&apos;єр, робоче місце, ваші роботи — те, що допомагає обрати саме вас.
+                  </p>
+                  <PhotoGallery photos={photos} slots={5} onChange={setPhotos} />
+                </div>
+
+                <Field label="Адреса" hint="клієнт зможе відкрити її в картах одним дотиком">
+                  <Input
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="вул. Хрещатик, 22, Київ"
+                  />
+                </Field>
+
+                <Field label="Instagram" hint="необов'язково">
+                  <Input
+                    value={instagram}
+                    onChange={(e) => setInstagram(e.target.value)}
+                    placeholder="https://instagram.com/ваш_салон"
+                  />
+                </Field>
+              </div>
+            )}
+
+            {step === 5 && (
               <div className="space-y-5">
                 <Header
                   title="Ваша сторінка онлайн-запису"

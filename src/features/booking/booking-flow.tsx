@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Confetti, DrawnCheck } from "@/components/shared/celebrate";
+import { VenueCard } from "@/features/booking/venue-card";
 import { Avatar } from "@/components/ui/avatar";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -56,6 +57,20 @@ type Organization = {
   requireEmail: boolean;
   welcomeText: string | null;
   horizonDays: number;
+  instagramUrl: string | null;
+  facebookUrl: string | null;
+  tiktokUrl: string | null;
+  /** Готове посилання на карти — зібране на сервері з mapsUrl або адреси. */
+  mapUrl: string | null;
+};
+
+export type GalleryPhoto = { id: string; url: string };
+
+export type BusinessHour = {
+  weekday: number;
+  openMinute: number;
+  closeMinute: number;
+  isClosed: boolean;
 };
 
 type Service = {
@@ -111,10 +126,14 @@ export function BookingFlow({
   organization,
   services,
   employees,
+  gallery = [],
+  hours = [],
 }: {
   organization: Organization;
   services: Service[];
   employees: Employee[];
+  gallery?: GalleryPhoto[];
+  hours?: BusinessHour[];
 }) {
   const [step, setStep] = React.useState(0);
   const [service, setService] = React.useState<Service | null>(null);
@@ -209,7 +228,7 @@ export function BookingFlow({
 
   if (!organization.enabled) {
     return (
-      <Shell organization={organization} accent={accent}>
+      <Shell organization={organization} accent={accent} gallery={gallery} hours={hours}>
         <div className="card">
           <EmptyState
             icon={CalendarX2}
@@ -227,7 +246,7 @@ export function BookingFlow({
 
   if (services.length === 0 || employees.length === 0) {
     return (
-      <Shell organization={organization} accent={accent}>
+      <Shell organization={organization} accent={accent} gallery={gallery} hours={hours}>
         <div className="card">
           <EmptyState
             icon={Sparkles}
@@ -241,7 +260,7 @@ export function BookingFlow({
 
   if (confirmation) {
     return (
-      <Shell organization={organization} accent={accent}>
+      <Shell organization={organization} accent={accent} gallery={gallery} hours={hours}>
         <motion.div
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -313,7 +332,7 @@ export function BookingFlow({
   const maxOffset = Math.ceil(Math.min(organization.horizonDays, 45) / 7) - 1;
 
   return (
-    <Shell organization={organization} accent={accent}>
+    <Shell organization={organization} accent={accent} gallery={gallery} hours={hours}>
       <BookingSteps step={step} accent={accent} onJump={setStep} />
 
       <AnimatePresence mode="wait">
@@ -720,8 +739,12 @@ function BookingSteps({
 function Shell({
   organization,
   accent,
+  gallery = [],
+  hours = [],
   children,
 }: {
+  gallery?: GalleryPhoto[];
+  hours?: BusinessHour[];
   organization: Organization;
   accent: string;
   children: React.ReactNode;
@@ -772,12 +795,25 @@ function Shell({
                 {organization.phone}
               </a>
             )}
-            {organization.address && (
-              <span className="flex items-center gap-1.5">
-                <MapPin className="h-3.5 w-3.5" />
-                {organization.address}
-              </span>
-            )}
+            {organization.address &&
+              (organization.mapUrl ? (
+                <a
+                  href={organization.mapUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="group flex items-center gap-1.5 hover:text-white"
+                >
+                  <MapPin className="h-3.5 w-3.5" />
+                  <span className="underline decoration-white/30 underline-offset-2 group-hover:decoration-white">
+                    {organization.address}
+                  </span>
+                </a>
+              ) : (
+                <span className="flex items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5" />
+                  {organization.address}
+                </span>
+              ))}
           </div>
         </div>
       </div>
@@ -786,6 +822,18 @@ function Shell({
         <div className="rounded-[20px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-pop)] sm:p-6">
           {children}
         </div>
+
+        <VenueCard
+          name={organization.name}
+          address={organization.address}
+          mapUrl={organization.mapUrl}
+          gallery={gallery}
+          hours={hours}
+          instagramUrl={organization.instagramUrl}
+          facebookUrl={organization.facebookUrl}
+          tiktokUrl={organization.tiktokUrl}
+          accent={accent}
+        />
 
         <p className="mt-6 text-center text-[12px] text-[var(--fg-subtle)]">
           Працює на{" "}

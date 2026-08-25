@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { AvatarUpload } from "@/features/media/avatar-upload";
 import { useActionState } from "react";
 import { AlertTriangle } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
@@ -25,6 +26,7 @@ export type EmployeeFormValues = {
   phone: string | null;
   color: string;
   bio: string | null;
+  avatarUrl: string | null;
   isActive: boolean;
   acceptsOnlineBooking: boolean;
   serviceIds: string[];
@@ -145,6 +147,8 @@ export function EmployeeModal({
             ))}
           </div>
         </Field>
+
+        <AvatarUpload name="avatarUrl" defaultUrl={employee?.avatarUrl} />
 
         <Field label="Про співробітника" hint="показується на сторінці онлайн-запису">
           <Textarea name="bio" defaultValue={employee?.bio ?? ""} rows={2} />

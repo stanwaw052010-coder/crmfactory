@@ -44,6 +44,30 @@ export const phoneSchema = z
 
 export const emailSchema = z.string().trim().toLowerCase().email("Некоректний email");
 
+/**
+ * Посилання на соцмережу.
+ *
+ * Люди вводять «instagram.com/salon» без схеми — вимагати https:// було б
+ * причіпкою, тому недостатню адресу доповнюємо самі. Схема при цьому
+ * обмежена http(s): інакше через `javascript:` у профілі салону відкривався
+ * б XSS на публічній сторінці.
+ */
+export const urlSchema = z
+  .string()
+  .trim()
+  .max(300, "Задовге посилання")
+  .transform((value) => (/^https?:\/\//i.test(value) ? value : `https://${value}`))
+  .refine((value) => {
+    try {
+      const parsed = new URL(value);
+      return parsed.protocol === "http:" || parsed.protocol === "https:";
+    } catch {
+      return false;
+    }
+  }, "Некоректне посилання");
+
+const optionalUrl = () => formValue.pipe(urlSchema.optional());
+
 const optionalPhone = () => formValue.pipe(phoneSchema.optional());
 const optionalEmail = () => formValue.pipe(emailSchema.optional());
 
@@ -116,6 +140,7 @@ export const employeeSchema = z.object({
   phone: optionalPhone(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#2563EB"),
   bio: optionalString(500),
+  avatarUrl: optionalString(500),
   isActive: z.boolean().default(true),
   acceptsOnlineBooking: z.boolean().default(true),
   serviceIds: z.array(z.string()).default([]),
@@ -219,6 +244,10 @@ export const organizationSchema = z.object({
   currency: z.enum(["EUR", "USD", "UAH", "PLN", "GBP", "CZK"]),
   brandColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#2563EB"),
   logoUrl: optionalString(500),
+  instagramUrl: optionalUrl(),
+  facebookUrl: optionalUrl(),
+  tiktokUrl: optionalUrl(),
+  mapsUrl: optionalUrl(),
 });
 
 export const bookingSettingsSchema = z.object({
@@ -377,6 +406,8 @@ export const onboardingSchema = z.object({
     .toLowerCase()
     .min(3, "Мінімум 3 символи")
     .regex(/^[a-z0-9-]+$/, "Лише латиниця, цифри та дефіс"),
+  address: optionalString(200),
+  instagramUrl: optionalUrl(),
 });
 
 export type ClientInput = z.infer<typeof clientSchema>;

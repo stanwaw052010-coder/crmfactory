@@ -29,6 +29,10 @@ export async function updateOrganizationAction(
       currency: formData.get("currency"),
       brandColor: formData.get("brandColor") || "#2563EB",
       logoUrl: formData.get("logoUrl"),
+      instagramUrl: formData.get("instagramUrl"),
+      facebookUrl: formData.get("facebookUrl"),
+      tiktokUrl: formData.get("tiktokUrl"),
+      mapsUrl: formData.get("mapsUrl"),
     });
 
     await prisma.organization.update({
@@ -44,6 +48,10 @@ export async function updateOrganizationAction(
         currency: input.currency,
         brandColor: input.brandColor,
         logoUrl: input.logoUrl ?? null,
+        instagramUrl: input.instagramUrl ?? null,
+        facebookUrl: input.facebookUrl ?? null,
+        tiktokUrl: input.tiktokUrl ?? null,
+        mapsUrl: input.mapsUrl ?? null,
       },
     });
 

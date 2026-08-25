@@ -158,6 +158,12 @@ model Organization {
   bookingWelcomeText  String?
   bookingRequireEmail Boolean @default(false)
 
+  // Посилання для клієнтів на публічній сторінці
+  instagramUrl String?
+  facebookUrl  String?
+  tiktokUrl    String?
+  mapsUrl      String?
+
   // Налаштування нагадувань (канали — під майбутні інтеграції)
   reminderEnabled     Boolean @default(true)
   reminderHoursBefore Int     @default(24)
@@ -179,10 +185,51 @@ model Organization {
   businessHours  BusinessHours[]
   reminders      ReminderJob[]
   auditLogs      AuditLog[]
+  media          MediaAsset[]
   subscription   Subscription?
 
   @@index([slug])
 }
+
+// ─── Медіа ───────────────────────────────────────────────────────────────────
+
+/// Куди прикріплене зображення.
+enum MediaKind {
+  GALLERY
+  LOGO
+  COVER
+  EMPLOYEE
+}
+
+/// Зображення, завантажені салоном: інтер'єр, роботи, фото майстрів.
+///
+/// Байти лежать у Postgres, а не в зовнішньому сховищі. Це свідомий вибір
+/// для цього етапу: салону вистачає десятка фото, а нульова конфігурація
+/// важливіша за ідеальну архітектуру — жодних ключів, бакетів і CORS.
+/// Файли стискаються в браузері до ~200 КБ, тож рядок лишається невеликим.
+/// Перехід на Vercel Blob чи S3 зачепить лише `src/server/media.ts`.
+///
+/// ВАЖЛИВО: `data` ніколи не вибирається у списках — тільки в роздачі
+/// одного файла. Інакше кожен рендер сторінки тягнув би мегабайти.
+model MediaAsset {
+  id             String    @id @default(cuid())
+  organizationId String
+  kind           MediaKind @default(GALLERY)
+  data           Bytes
+  mimeType       String
+  width          Int
+  height         Int
+  sizeBytes      Int
+  caption        String?
+  sortOrder      Int       @default(0)
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, kind, sortOrder])
+}
+
+// ─── Тарифи та підписка ──────────────────────────────────────────────────────
 
 enum Plan {
   FREE

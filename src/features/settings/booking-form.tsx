@@ -4,6 +4,7 @@ import * as React from "react";
 import { useActionState } from "react";
 import { Check, Copy, ExternalLink, QrCode, Share2 } from "lucide-react";
 import { Card, CardHeader, CardBody } from "@/components/ui/card";
+import { PhotoGallery } from "@/features/media/photo-gallery";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select, Switch } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/input";
@@ -23,7 +24,9 @@ export function BookingForm({
   businessHours,
   appUrl,
   canManage,
+  gallery,
 }: {
+  gallery: { id: string; url: string }[];
   organization: {
     slug: string;
     bookingEnabled: boolean;
@@ -125,6 +128,17 @@ export function BookingForm({
               </a>
             </div>
           </div>
+        </CardBody>
+      </Card>
+
+      {/* Фото салону */}
+      <Card>
+        <CardHeader
+          title="Фото салону"
+          description="До п'яти знімків — інтер'єр, робоче місце, ваші роботи. Клієнт бачить їх під формою запису"
+        />
+        <CardBody>
+          <PhotoGallery photos={gallery} slots={5} disabled={!canManage} />
         </CardBody>
       </Card>
 

@@ -20,6 +20,8 @@ type OnboardingPayload = {
   openMinute: number;
   closeMinute: number;
   workingDays: number[];
+  address?: string;
+  instagramUrl?: string;
 };
 
 /**
@@ -47,6 +49,8 @@ export async function completeOnboardingAction(
           industry: input.industry,
           timezone: input.timezone,
           currency: input.currency,
+          address: input.address ?? null,
+          instagramUrl: input.instagramUrl ?? null,
           slug,
           onboardingCompleted: true,
           onboardingStep: 6,
