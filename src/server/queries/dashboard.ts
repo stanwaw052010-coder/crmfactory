@@ -154,6 +154,10 @@ export async function getDashboardData(organizationId: string, employeeFilter?: 
 
   return {
     todayAppointments,
+    // Час, на який зібрано ці дані. Клієнтський розклад бере його за
+    // стартову точку живого годинника — інакше «йде зараз» довелося б
+    // рахувати від `Date.now()` у рендері, а це не чиста функція.
+    generatedAt: now.getTime(),
     stats: {
       todayCount,
       yesterdayCount,

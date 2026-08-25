@@ -142,6 +142,7 @@ async function DashboardContent() {
             items={data.todayAppointments}
             currency={currency}
             canCreate={ctx.permissions.has("appointment.create")}
+            serverNow={data.generatedAt}
           />
 
           {ctx.permissions.has("analytics.view") && (
