@@ -4,18 +4,27 @@ import * as React from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUp, Loader2, Sparkles, X } from "lucide-react";
 import { createPortal } from "react-dom";
+import { RichText } from "@/features/ai/rich-text";
 import { useIsClient } from "@/hooks/use-is-client";
 import { cn } from "@/lib/utils";
 import { askFactoryAiAction } from "@/server/actions/ai";
 
 type Turn = { role: "user" | "assistant"; content: string };
 
-/** Питання, з яких найлегше почати — вони ж пояснюють, що асистент уміє. */
+/**
+ * Питання, з яких найлегше почати — вони ж пояснюють, що асистент уміє.
+ *
+ * Кожне навмисно вимагає кількох інструментів і порівняння між ними:
+ * на таке питання не відповісти, глянувши на один екран, тож відповідь
+ * одразу показує, навіщо тут асистент. Питання на один показник
+ * («яка виручка за місяць?») справляють протилежне враження — його
+ * видно на дашборді й без AI.
+ */
 const SUGGESTIONS = [
-  "Які послуги принесли найбільше грошей цього місяця?",
-  "Кому з клієнтів пора нагадати про себе?",
-  "Як змінилася виручка проти минулого місяця?",
-  "Хто з майстрів найзавантаженіший?",
+  "Що приносить найбільше грошей і як це змінилося проти минулого місяця?",
+  "Кому з клієнтів пора нагадати про себе і чому саме їм?",
+  "Хто з майстрів заробляє найбільше, а хто найзавантаженіший?",
+  "Подивись на всі мої цифри за місяць і скажи, що з ними не так",
 ];
 
 export function AssistantPanel({
@@ -230,13 +239,13 @@ function Bubble({ turn }: { turn: Turn }) {
     <div className={cn("animate-fade-up flex", isUser ? "justify-end" : "justify-start")}>
       <div
         className={cn(
-          "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[13.5px] leading-relaxed whitespace-pre-wrap",
+          "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[13.5px] leading-relaxed",
           isUser
-            ? "bg-[var(--primary)] text-white"
+            ? "bg-[var(--primary)] whitespace-pre-wrap text-white"
             : "bg-[var(--surface-2)] text-[var(--fg)]",
         )}
       >
-        {turn.content}
+        {isUser ? turn.content : <RichText text={turn.content} />}
       </div>
     </div>
   );
