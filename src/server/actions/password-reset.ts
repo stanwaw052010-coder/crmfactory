@@ -62,11 +62,13 @@ export async function requestPasswordResetAction(
 
     if (user) {
       const { rawToken } = await issueResetToken(user.id, ip);
-      const url = `${await appOrigin()}/reset-password?token=${rawToken}`;
+      const origin = await appOrigin();
+      const url = `${origin}/reset-password?token=${rawToken}`;
       const mail = passwordResetEmail({
         name: user.name,
         url,
         minutes: RESET_TTL_MINUTES,
+        appUrl: origin,
       });
 
       await sendMail({ to: user.email, ...mail });

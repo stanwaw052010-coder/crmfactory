@@ -3,6 +3,18 @@ import "server-only";
 /**
  * HTML-листи пишуться таблицями та інлайновими стилями — це не архаїзм,
  * а вимога поштових клієнтів (Outlook не підтримує flex/grid і <style>).
+ *
+ * ВАЖЛИВО про назву бренду в листі.
+ *
+ * `.factory` — справжня доменна зона, тому Gmail, Apple Mail і Outlook
+ * бачать голий текст «crm.factory» як адресу сайту й самі роблять із
+ * нього посилання. Виглядає воно як звичайне синє посилання зверху листа,
+ * але веде не до нас: браузер іде шукати неіснуючий домен і викидає
+ * користувача на випадковий чужий сайт. Людина при цьому впевнена, що
+ * натиснула на наш логотип.
+ *
+ * Тому кожна згадка бренду в листі обгорнута у власний `<a>` з нашою
+ * адресою: поштовий клієнт не чіпає текст, який уже є посиланням.
  */
 
 function escapeHtml(value: string): string {
@@ -13,7 +25,8 @@ function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function shell(title: string, body: string): string {
+function shell(title: string, body: string, appUrl: string): string {
+  const home = encodeURI(appUrl);
   return `<!doctype html>
 <html lang="uk">
 <body style="margin:0;padding:0;background:#f6f8fc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
@@ -23,7 +36,7 @@ function shell(title: string, body: string): string {
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border:1px solid #e3e9f2;border-radius:16px;overflow:hidden;">
           <tr>
             <td style="padding:28px 32px 0 32px;">
-              <span style="font-size:17px;font-weight:600;letter-spacing:-0.02em;color:#0f172a;">crm<span style="color:#2563eb;">.</span>factory</span>
+              <a href="${home}" style="font-size:17px;font-weight:600;letter-spacing:-0.02em;color:#0f172a;text-decoration:none;">crm<span style="color:#2563eb;">.</span>factory</a>
             </td>
           </tr>
           <tr>
@@ -34,7 +47,8 @@ function shell(title: string, body: string): string {
           </tr>
         </table>
         <p style="max-width:520px;margin:16px auto 0 auto;font-size:12px;line-height:1.6;color:#94a3b8;">
-          Цей лист надіслано автоматично сервісом crm.factory.
+          Цей лист надіслано автоматично сервісом
+          <a href="${home}" style="color:#94a3b8;text-decoration:none;">crm<span style="color:#94a3b8;">.</span>factory</a>.
         </p>
       </td>
     </tr>
@@ -43,7 +57,13 @@ function shell(title: string, body: string): string {
 </html>`;
 }
 
-export function passwordResetEmail(params: { name: string; url: string; minutes: number }) {
+export function passwordResetEmail(params: {
+  name: string;
+  url: string;
+  minutes: number;
+  /** Адреса застосунку — щоб назва бренду в листі вела саме до нас. */
+  appUrl: string;
+}) {
   const safeUrl = encodeURI(params.url);
   const html = shell(
     "Відновлення пароля",
@@ -63,12 +83,15 @@ export function passwordResetEmail(params: { name: string; url: string; minutes:
      <p style="margin:0;padding-top:20px;border-top:1px solid #e3e9f2;font-size:12.5px;line-height:1.6;color:#94a3b8;">
        Не ви робили цей запит? Просто проігноруйте лист — пароль лишиться попереднім.
      </p>`,
+    params.appUrl,
   );
 
   const text = [
     `Вітаємо, ${params.name}!`,
     "",
-    "Ми отримали запит на зміну пароля до вашого акаунта crm.factory.",
+    // Без голого «crm.factory» у реченні: у плейн-тексті поштовий клієнт
+    // теж зробив би з нього посилання на неіснуючий домен.
+    "Ми отримали запит на зміну пароля до вашого акаунта в CRM.",
     `Посилання дійсне ${params.minutes} хвилин і спрацює лише один раз:`,
     "",
     params.url,
@@ -79,7 +102,7 @@ export function passwordResetEmail(params: { name: string; url: string; minutes:
   return { subject: "Відновлення пароля — crm.factory", html, text };
 }
 
-export function testEmailHtml(name: string): string {
+export function testEmailHtml(name: string, appUrl: string): string {
   return shell(
     "Пошта працює",
     `<p style="margin:0 0 20px 0;font-size:14.5px;line-height:1.65;color:#475569;">
@@ -90,5 +113,6 @@ export function testEmailHtml(name: string): string {
      <p style="margin:0;padding-top:20px;border-top:1px solid #e3e9f2;font-size:12.5px;line-height:1.6;color:#94a3b8;">
        Нічого робити не потрібно — просто перевірка.
      </p>`,
+    appUrl,
   );
 }

@@ -104,6 +104,11 @@ export async function setOrganizationPlanAction(input: {
  * пароль і піти читати логи хостингу. Тут одразу видно результат і
  * причину відмови, якщо лист не пішов.
  */
+/** Адреса застосунку для посилань у листі. */
+function appOrigin(): string {
+  return process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/+$/, "") || "https://crm.factory";
+}
+
 export async function sendTestEmailAction(
   _prev: ActionResult<{ message: string }> | null,
   formData: FormData,
@@ -132,7 +137,7 @@ export async function sendTestEmailAction(
     const result = await sendMail({
       to: input.to,
       subject: "Перевірка пошти — crm.factory",
-      html: testEmailHtml(user.name),
+      html: testEmailHtml(user.name, appOrigin()),
       text: `Якщо ви читаєте цей лист, відправка з crm.factory працює.\n\nВідправник: ${status.from}`,
     });
 
