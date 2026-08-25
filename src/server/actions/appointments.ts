@@ -12,6 +12,7 @@ import {
 import { fail, ok, toActionError, type ActionResult } from "@/lib/errors";
 import { audit } from "@/lib/audit";
 import { notify } from "@/lib/notifications";
+import { runAutomations } from "@/server/automation-engine";
 import {
   cancelAppointmentReminders,
   scheduleAppointmentReminders,
@@ -163,6 +164,12 @@ export async function createAppointmentAction(
     }
 
     await scheduleAppointmentReminders(appointment.id);
+    // Автоматизації запускаються ПІСЛЯ того, як запис уже збережено:
+    // збій правила не має коштувати користувачу втраченого запису.
+    await runAutomations("APPOINTMENT_CREATED", {
+      organizationId: ctx.organization.id,
+      appointmentId: appointment.id,
+    });
     await audit({
       organizationId: ctx.organization.id,
       userId: ctx.user.id,
@@ -350,6 +357,22 @@ export async function setAppointmentStatusAction(input: {
         cancelReason: parsed.status === "CANCELLED" ? (parsed.cancelReason ?? null) : null,
       },
     });
+
+    const statusTrigger =
+      parsed.status === "COMPLETED"
+        ? ("APPOINTMENT_COMPLETED" as const)
+        : parsed.status === "CANCELLED"
+          ? ("APPOINTMENT_CANCELLED" as const)
+          : parsed.status === "NO_SHOW"
+            ? ("APPOINTMENT_NO_SHOW" as const)
+            : null;
+
+    if (statusTrigger) {
+      await runAutomations(statusTrigger, {
+        organizationId: ctx.organization.id,
+        appointmentId: parsed.id,
+      });
+    }
 
     if (parsed.status === "CANCELLED" || parsed.status === "NO_SHOW") {
       await cancelAppointmentReminders(parsed.id);

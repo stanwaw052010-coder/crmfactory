@@ -8,6 +8,7 @@ import { clientIp, audit } from "@/lib/audit";
 import { notify } from "@/lib/notifications";
 import { scheduleAppointmentReminders } from "@/lib/reminders";
 import { availableSlots } from "@/lib/availability";
+import { runAutomations } from "@/server/automation-engine";
 import { combineDateTime, fromDateKey, toDateKey } from "@/lib/time";
 
 /**
@@ -256,6 +257,12 @@ export async function createPublicBookingAction(
     });
 
     await scheduleAppointmentReminders(appointment.id);
+    // Запис з публічної сторінки — така сама подія, як створений у CRM.
+    // Правило «онлайн-запис → сповістити адміністратора» саме про це.
+    await runAutomations("APPOINTMENT_CREATED", {
+      organizationId: organization.id,
+      appointmentId: appointment.id,
+    });
     await notify({
       organizationId: organization.id,
       type: "BOOKING_CREATED",

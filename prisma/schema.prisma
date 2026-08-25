@@ -186,6 +186,8 @@ model Organization {
   reminders      ReminderJob[]
   auditLogs      AuditLog[]
   media          MediaAsset[]
+  automations    Automation[]
+  automationRuns AutomationRun[]
   subscription   Subscription?
 
   @@index([slug])
@@ -227,6 +229,71 @@ model MediaAsset {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId, kind, sortOrder])
+}
+
+// ─── Автоматизації ───────────────────────────────────────────────────────────
+
+/// Подія, на яку спрацьовує правило.
+enum AutomationTrigger {
+  APPOINTMENT_CREATED
+  APPOINTMENT_COMPLETED
+  APPOINTMENT_CANCELLED
+  APPOINTMENT_NO_SHOW
+  CLIENT_CREATED
+}
+
+enum AutomationRunStatus {
+  MATCHED
+  SKIPPED
+  FAILED
+}
+
+/// Правило «Коли → Якщо → Тоді».
+///
+/// Умови й дії лежать у JSON, а не окремими таблицями: набір полів у них
+/// різний для кожного типу, і нормалізувати це означало б завести
+/// таблицю з колонкою `value String` — тобто той самий JSON, лише
+/// повільніший. Форма перевіряється схемою Zod на вході (lib/automation.ts),
+/// тож у базу неможливо покласти правило, яке рушій не зрозуміє.
+model Automation {
+  id             String            @id @default(cuid())
+  organizationId String
+  name           String
+  trigger        AutomationTrigger
+  /// Умови, які МАЮТЬ виконатись усі разом.
+  conditions     Json              @default("[]")
+  /// Дії, що виконуються по черзі.
+  actions        Json              @default("[]")
+  isActive       Boolean           @default(true)
+  runCount       Int               @default(0)
+  lastRunAt      DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  runs         AutomationRun[]
+
+  @@index([organizationId, trigger, isActive])
+}
+
+/// Журнал спрацювань — без нього автоматизація виглядає як магія,
+/// про яку неможливо сказати, працює вона чи ні.
+model AutomationRun {
+  id             String              @id @default(cuid())
+  automationId   String
+  organizationId String
+  status         AutomationRunStatus
+  entityType     String?
+  entityId       String?
+  /// Що саме сталося: які дії виконано або чому пропущено.
+  detail         String?
+  createdAt      DateTime            @default(now())
+
+  automation   Automation   @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([automationId, createdAt])
+  @@index([organizationId, createdAt])
 }
 
 // ─── Тарифи та підписка ──────────────────────────────────────────────────────

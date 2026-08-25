@@ -8,6 +8,7 @@ import { clientNoteSchema, clientSchema } from "@/lib/validation";
 import { fail, ok, toActionError, type ActionResult } from "@/lib/errors";
 import { audit } from "@/lib/audit";
 import { notify } from "@/lib/notifications";
+import { runAutomations } from "@/server/automation-engine";
 
 function parseClientForm(formData: FormData) {
   return clientSchema.parse({
@@ -64,6 +65,10 @@ export async function createClientAction(
       },
     });
 
+    await runAutomations("CLIENT_CREATED", {
+      organizationId: ctx.organization.id,
+      clientId: client.id,
+    });
     await audit({
       organizationId: ctx.organization.id,
       userId: ctx.user.id,
@@ -217,6 +222,12 @@ export async function quickCreateClientAction(input: {
         phone: parsed.phone ?? null,
         status: "NEW",
       },
+    });
+    // Швидке створення з форми запису — така сама поява клієнта в базі,
+    // як і повна форма, тож правила мають спрацювати й тут.
+    await runAutomations("CLIENT_CREATED", {
+      organizationId: ctx.organization.id,
+      clientId: client.id,
     });
     revalidatePath("/clients");
     return ok({ id: client.id, label: client.firstName });

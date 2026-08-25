@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Building2, CalendarClock, CreditCard, UserCog, Users } from "lucide-react";
+import { Bell, Building2, CalendarClock, CreditCard, UserCog, Users, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ITEMS = [
   { href: "/settings", label: "Бізнес", icon: Building2, permission: "settings.view", exact: true },
   { href: "/settings/booking", label: "Онлайн-запис", icon: CalendarClock, permission: "settings.view" },
   { href: "/settings/team", label: "Команда і доступи", icon: Users, permission: "team.manage" },
+  { href: "/settings/automations", label: "Автоматизації", icon: Zap, permission: "settings.view" },
   { href: "/settings/notifications", label: "Сповіщення", icon: Bell, permission: "settings.manage" },
   { href: "/settings/billing", label: "Тариф", icon: CreditCard, permission: "billing.manage" },
   { href: "/settings/profile", label: "Мій профіль", icon: UserCog, permission: "dashboard.view" },
