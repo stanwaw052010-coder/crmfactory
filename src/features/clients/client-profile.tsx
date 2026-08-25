@@ -37,6 +37,8 @@ import {
 import { ClientModal, type ClientFormValues } from "@/features/clients/client-modal";
 import { addClientNoteAction, deleteClientNoteAction } from "@/server/actions/clients";
 import { LoyaltyCard } from "@/features/clients/loyalty-card";
+import { CustomerPortrait } from "@/features/clients/customer-portrait";
+import { ClientTimeline, buildTimeline } from "@/features/clients/client-timeline";
 import { formatMoney } from "@/lib/money";
 import { formatDateUk, formatTime, relativeUk, toDateKey } from "@/lib/time";
 import type { AppointmentStatus, ClientStatus, PaymentStatus } from "@prisma/client";
@@ -106,6 +108,10 @@ export function ClientProfile({
     cancelled: number;
     noShow: number;
     lastVisitAt: Date | null;
+    topServices: { name: string; count: number }[];
+    topEmployee: { name: string; count: number } | null;
+    rhythmDays: number | null;
+    overdue: number | null;
   };
   nextVisit: { startAt: Date; service: { name: string }; employee: { name: string } } | null;
   currency: string;
@@ -286,6 +292,7 @@ export function ClientProfile({
         onChange={setTab}
         tabs={[
           { value: "overview", label: "Огляд" },
+          { value: "timeline", label: "Історія" },
           { value: "appointments", label: "Записи", count: appointments.length },
           { value: "payments", label: "Платежі", count: payments.length },
           { value: "notes", label: "Нотатки", count: notes.length },
@@ -307,6 +314,14 @@ export function ClientProfile({
             )}
           </Card>
 
+          <div className="space-y-6">
+          <CustomerPortrait
+            topServices={stats.topServices}
+            topEmployee={stats.topEmployee}
+            rhythmDays={stats.rhythmDays}
+            visits={stats.visits}
+          />
+
           <Card>
             <CardHeader title="Профіль клієнта" />
             <CardBody className="space-y-3">
@@ -320,7 +335,26 @@ export function ClientProfile({
               />
             </CardBody>
           </Card>
+          </div>
         </div>
+      )}
+
+      {tab === "timeline" && (
+        <Card>
+          <CardHeader
+            title="Історія"
+            description="Візити, оплати й нотатки в одній стрічці"
+          />
+          <ClientTimeline
+            events={buildTimeline({
+              createdAt: client.createdAt,
+              appointments,
+              payments,
+              notes,
+              currency,
+            })}
+          />
+        </Card>
       )}
 
       {tab === "appointments" && (

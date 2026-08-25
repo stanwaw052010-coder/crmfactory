@@ -1,6 +1,7 @@
 import "server-only";
 import type { ClientStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
+import { visitRhythm } from "@/lib/churn";
 
 export const CLIENT_PAGE_SIZE = 20;
 
@@ -185,6 +186,32 @@ export async function getClientProfile(organizationId: string, clientId: string)
   ]);
 
   const completedAppointments = appointments.filter((a) => a.status === "COMPLETED");
+
+  // ── Портрет клієнта ──────────────────────────────────────────────────
+  // Улюблені послуга й майстер — це не прикраса картки: саме з них
+  // починається розмова «давно вас не було, записати на звичне?».
+  const serviceCounts = new Map<string, number>();
+  const employeeCounts = new Map<string, number>();
+
+  for (const appointment of completedAppointments) {
+    const service = appointment.service?.name;
+    if (service) serviceCounts.set(service, (serviceCounts.get(service) ?? 0) + 1);
+
+    const employee = appointment.employee?.name;
+    if (employee) employeeCounts.set(employee, (employeeCounts.get(employee) ?? 0) + 1);
+  }
+
+  const topServices = [...serviceCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([name, count]) => ({ name, count }));
+
+  const topEmployee = [...employeeCounts.entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
+
+  const rhythm = visitRhythm(
+    completedAppointments.filter((a) => a.startAt <= now).map((a) => a.startAt),
+    now,
+  );
   const totalCents = stats._sum.amountCents ?? 0;
   const paidCount = stats._count._all;
 
@@ -208,6 +235,11 @@ export async function getClientProfile(organizationId: string, clientId: string)
       cancelled: appointments.filter((a) => a.status === "CANCELLED").length,
       noShow: appointments.filter((a) => a.status === "NO_SHOW").length,
       lastVisitAt,
+      topServices,
+      topEmployee: topEmployee ? { name: topEmployee[0], count: topEmployee[1] } : null,
+      /** Медіанний інтервал між візитами — `null`, поки візитів менше трьох. */
+      rhythmDays: rhythm?.intervalDays ?? null,
+      overdue: rhythm?.overdue ?? null,
     },
   };
 }
