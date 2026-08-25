@@ -314,6 +314,10 @@ export const resetPasswordSchema = z
     path: ["confirmPassword"],
   });
 
+export const testEmailSchema = z.object({
+  to: emailSchema,
+});
+
 /** Аварійне відновлення доступу власника платформи за ключем із env. */
 export const recoverySchema = z
   .object({

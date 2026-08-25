@@ -8,6 +8,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { formatMoney } from "@/lib/money";
 import { PLAN_PRICE_CENTS } from "@/lib/plans";
 import { OrganizationsTable } from "@/features/admin/organizations-table";
+import { MailStatusCard } from "@/features/admin/mail-status";
+import { mailStatus } from "@/lib/mail";
 import { addDays, relativeUk } from "@/lib/time";
 
 export const metadata: Metadata = { title: "Super Admin" };
@@ -15,8 +17,9 @@ export const metadata: Metadata = { title: "Super Admin" };
 
 
 export default async function AdminPage() {
-  await requireSuperAdmin();
+  const superAdmin = await requireSuperAdmin();
   const monthAgo = addDays(new Date(), -30);
+  const mail = mailStatus();
 
   const [
     organizations,
@@ -122,6 +125,14 @@ export default async function AdminPage() {
           }))}
         />
 
+        <div className="space-y-6">
+        <MailStatusCard
+          configured={mail.configured}
+          from={mail.from}
+          sandboxSender={mail.sandboxSender}
+          defaultTo={superAdmin.email}
+        />
+
         <Card>
           <CardHeader title="Системний журнал" description="Останні дії в платформі" />
           {recentLogs.length === 0 ? (
@@ -143,6 +154,7 @@ export default async function AdminPage() {
             </ul>
           )}
         </Card>
+        </div>
       </div>
     </div>
   );

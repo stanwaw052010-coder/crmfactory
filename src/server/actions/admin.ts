@@ -7,6 +7,9 @@ import { getCurrentUser } from "@/lib/auth/context";
 import { fail, ok, toActionError, type ActionResult } from "@/lib/errors";
 import { audit } from "@/lib/audit";
 import { PLAN_PRICE_CENTS } from "@/lib/plans";
+import { mailStatus, sendMail } from "@/lib/mail";
+import { testEmailHtml } from "@/lib/mail/templates";
+import { testEmailSchema } from "@/lib/validation";
 
 /**
  * Дії панелі платформи.
@@ -90,5 +93,51 @@ export async function setOrganizationPlanAction(input: {
     return ok(null);
   } catch (error) {
     return toActionError(error);
+  }
+}
+
+/**
+ * Тестовий лист із панелі платформи.
+ *
+ * Сенс дії — прибрати здогадки з налаштування пошти. Без неї єдиний
+ * спосіб дізнатися, чи працює відправка, — попросити когось скинути
+ * пароль і піти читати логи хостингу. Тут одразу видно результат і
+ * причину відмови, якщо лист не пішов.
+ */
+export async function sendTestEmailAction(
+  _prev: ActionResult<{ message: string }> | null,
+  formData: FormData,
+): Promise<ActionResult<{ message: string }>> {
+  try {
+    const { user, error } = await requireSuperAdminOrFail();
+    if (error || !user) return error ?? fail("Недостатньо прав");
+
+    const input = testEmailSchema.parse({ to: formData.get("to") });
+    const status = mailStatus();
+
+    if (!status.configured) {
+      return fail(
+        "RESEND_API_KEY не задано — лист піде в лог сервера, а не адресату. Додайте ключ у змінні середовища й перезапустіть деплой.",
+      );
+    }
+
+    const result = await sendMail({
+      to: input.to,
+      subject: "Перевірка пошти — crm.factory",
+      html: testEmailHtml(user.name),
+      text: `Якщо ви читаєте цей лист, відправка з crm.factory працює.\n\nВідправник: ${status.from}`,
+    });
+
+    if (result.error) return fail(result.error);
+
+    await audit({
+      userId: user.id,
+      action: "admin.test_email_sent",
+      meta: { to: input.to },
+    });
+
+    return ok({ message: `Лист надіслано на ${input.to}. Перевірте вхідні та «Спам».` });
+  } catch (caught) {
+    return toActionError(caught);
   }
 }

@@ -78,3 +78,17 @@ export function passwordResetEmail(params: { name: string; url: string; minutes:
 
   return { subject: "Відновлення пароля — crm.factory", html, text };
 }
+
+export function testEmailHtml(name: string): string {
+  return shell(
+    "Пошта працює",
+    `<p style="margin:0 0 20px 0;font-size:14.5px;line-height:1.65;color:#475569;">
+       Вітаємо, ${escapeHtml(name)}! Це тестовий лист із панелі платформи.
+       Якщо ви його бачите — відправка налаштована правильно, і листи про
+       відновлення пароля дійдуть до ваших клієнтів.
+     </p>
+     <p style="margin:0;padding-top:20px;border-top:1px solid #e3e9f2;font-size:12.5px;line-height:1.6;color:#94a3b8;">
+       Нічого робити не потрібно — просто перевірка.
+     </p>`,
+  );
+}

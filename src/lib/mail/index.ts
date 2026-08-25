@@ -17,6 +17,57 @@ export type MailChannel = "email" | "log";
 
 export type MailResult = { channel: MailChannel; error?: string };
 
+export type MailStatus = {
+  configured: boolean;
+  from: string;
+  /** Пісочниця Resend: листи йдуть ЛИШЕ на адресу власника акаунта. */
+  sandboxSender: boolean;
+};
+
+const SANDBOX_DOMAIN = "resend.dev";
+
+export function mailStatus(): MailStatus {
+  const from = fromAddress();
+  return {
+    configured: mailEnabled(),
+    from,
+    sandboxSender: from.includes(SANDBOX_DOMAIN),
+  };
+}
+
+/**
+ * Людське пояснення до відмови Resend.
+ *
+ * Найчастіша причина — спроба писати на чужу адресу з тестового
+ * відправника `onboarding@resend.dev`. Resend віддає на це 403, і без
+ * розшифровки повідомлення «щось пішло не так» нічим не допомагає.
+ */
+function explainResendError(status: number, body: string): string {
+  const lowered = body.toLowerCase();
+
+  if (status === 401 || status === 403) {
+    if (lowered.includes("own email") || lowered.includes("testing emails")) {
+      return (
+        "Resend дозволяє тестовому відправнику onboarding@resend.dev писати лише на ваш власний email. " +
+        "Щоб писати клієнтам — підтвердіть свій домен у Resend → Domains і вкажіть його в MAIL_FROM."
+      );
+    }
+    if (lowered.includes("domain") && lowered.includes("verif")) {
+      return "Домен у MAIL_FROM не підтверджено в Resend. Resend → Domains → Add Domain.";
+    }
+    return "Resend відхилив ключ. Перевірте RESEND_API_KEY — можливо, скопійовано не повністю.";
+  }
+
+  if (status === 422) {
+    return "Resend не прийняв адресу відправника. MAIL_FROM має бути у форматі: Назва <email@домен>.";
+  }
+  if (status === 429) {
+    return "Забагато листів за короткий час — Resend тимчасово обмежив відправку.";
+  }
+
+  return `Resend повернув помилку ${status}. ${body.slice(0, 200)}`;
+}
+
 export type MailMessage = {
   to: string;
   subject: string;
@@ -71,12 +122,15 @@ export async function sendMail(message: MailMessage): Promise<MailResult> {
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
       console.error("[mail] Resend відхилив лист", response.status, detail.slice(0, 500));
-      return { channel: "email", error: `resend_${response.status}` };
+      return { channel: "email", error: explainResendError(response.status, detail) };
     }
 
     return { channel: "email" };
   } catch (error) {
     console.error("[mail] не вдалося звернутися до Resend", error);
-    return { channel: "email", error: "network" };
+    return {
+      channel: "email",
+      error: "Не вдалося зв'язатися з Resend. Перевірте, чи не блокує вихідні запити ваш хостинг.",
+    };
   }
 }
