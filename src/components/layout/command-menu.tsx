@@ -273,6 +273,9 @@ export function CommandMenu({ permissions }: { permissions: string[] }) {
               <span className="flex items-center gap-1">
                 <Kbd>↵</Kbd> відкрити
               </span>
+              <span className="hidden items-center gap-1 sm:flex">
+                <Kbd>?</Kbd> гарячі клавіші
+              </span>
               <span className="ml-auto flex items-center gap-1">
                 <Kbd>esc</Kbd> закрити
               </span>
