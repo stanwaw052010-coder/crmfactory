@@ -7,6 +7,7 @@ import { consume, LIMITS } from "@/lib/rate-limit";
 import { clientIp, audit } from "@/lib/audit";
 import { notify } from "@/lib/notifications";
 import { scheduleAppointmentReminders } from "@/lib/reminders";
+import { sendAppointmentConfirmation } from "@/lib/appointment-mail";
 import { availableSlots } from "@/lib/availability";
 import { runAutomations } from "@/server/automation-engine";
 import { combineDateTime, fromDateKey, toDateKey } from "@/lib/time";
@@ -257,6 +258,8 @@ export async function createPublicBookingAction(
     });
 
     await scheduleAppointmentReminders(appointment.id);
+    // Клієнт залишив email — він чекає підтвердження, а не тиші.
+    await sendAppointmentConfirmation(appointment.id);
     // Запис з публічної сторінки — така сама подія, як створений у CRM.
     // Правило «онлайн-запис → сповістити адміністратора» саме про це.
     await runAutomations("APPOINTMENT_CREATED", {

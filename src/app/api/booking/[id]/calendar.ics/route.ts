@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { buildIcs } from "@/lib/calendar-file";
 import { formatMoney } from "@/lib/money";
+import { wallClockToUtc } from "@/lib/wall-clock";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +37,14 @@ export async function GET(
       service: { select: { name: true } },
       employee: { select: { name: true } },
       organization: {
-        select: { name: true, address: true, phone: true, currency: true, slug: true },
+        select: {
+          name: true,
+          address: true,
+          phone: true,
+          currency: true,
+          slug: true,
+          timezone: true,
+        },
       },
     },
   });
@@ -57,8 +65,10 @@ export async function GET(
 
   const ics = buildIcs({
     uid: `${appointment.id}@crm.factory`,
-    start: appointment.startAt,
-    end: appointment.endAt,
+    // Час візиту зберігається настінним годинником салону; календар читає
+    // позначку буквально, тож переводимо в справжній момент.
+    start: wallClockToUtc(appointment.startAt, appointment.organization.timezone),
+    end: wallClockToUtc(appointment.endAt, appointment.organization.timezone),
     summary: `${service.name} — ${organization.name}`,
     description,
     location: organization.address ?? undefined,

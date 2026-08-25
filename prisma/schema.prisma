@@ -704,6 +704,9 @@ enum ReminderChannel {
 
 enum ReminderStatus {
   PENDING
+  /// Задачу забрав воркер. Проміжний стан, щоб два одночасні запуски
+  /// планувальника не надіслали клієнту одне нагадування двічі.
+  SENDING
   SENT
   FAILED
   CANCELLED
@@ -723,6 +726,7 @@ model ReminderJob {
   error          String?
   payload        Json?
   createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   appointment  Appointment  @relation(fields: [appointmentId], references: [id], onDelete: Cascade)

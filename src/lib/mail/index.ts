@@ -97,11 +97,22 @@ function explainResendError(status: number, body: string): string {
   return `Resend повернув помилку ${status}. ${body.slice(0, 200)}`;
 }
 
+/**
+ * Вкладення листа. `content` — вміст файлу у base64, як того вимагає Resend.
+ * Використовується для .ics: лист із записом одразу лягає в календар клієнта.
+ */
+export type MailAttachment = {
+  filename: string;
+  content: string;
+  contentType?: string;
+};
+
 export type MailMessage = {
   to: string;
   subject: string;
   html: string;
   text: string;
+  attachments?: MailAttachment[];
 };
 
 export function mailEnabled(): boolean {
@@ -123,6 +134,9 @@ export async function sendMail(message: MailMessage): Promise<MailResult> {
         " RESEND_API_KEY не заданий — лист не відправлено, а виведено тут.",
         ` Кому:  ${message.to}`,
         ` Тема:  ${message.subject}`,
+        ...(message.attachments?.length
+          ? [` Файли: ${message.attachments.map((f) => f.filename).join(", ")}`]
+          : []),
         "",
         message.text,
         "──────────────────────────────────────────────────────────────",
@@ -145,6 +159,15 @@ export async function sendMail(message: MailMessage): Promise<MailResult> {
         subject: message.subject,
         html: message.html,
         text: message.text,
+        ...(message.attachments?.length
+          ? {
+              attachments: message.attachments.map((file) => ({
+                filename: file.filename,
+                content: file.content,
+                ...(file.contentType ? { content_type: file.contentType } : {}),
+              })),
+            }
+          : {}),
       }),
     });
 

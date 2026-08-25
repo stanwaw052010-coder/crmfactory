@@ -1,0 +1,50 @@
+# Планувальник нагадувань про записи.
+#
+# Чому GitHub Actions, а не `crons` у vercel.json: планувальник Vercel на
+# тарифі Hobby вміє запускати задачу лише РАЗ НА ДОБУ — частіші вирази
+# відхиляються ще на деплої. Нагадування за годину-дві до візиту цього не
+# переживуть. Actions запускається кожні 15 хвилин безкоштовно.
+#
+# На тарифі Vercel Pro цей файл можна видалити й перенести розклад у
+# vercel.json — застосунок від цього не змінюється, ендпоінт той самий.
+#
+# Що потрібно задати в Settings → Secrets and variables → Actions:
+#   APP_URL      — https://crmfactory.business
+#   CRON_SECRET  — той самий рядок, що у змінних середовища Vercel
+
+name: Нагадування клієнтам
+
+on:
+  schedule:
+    # Кожні 15 хвилин. GitHub може затримати запуск на 5–20 хвилин під
+    # навантаженням — для нагадувань за годину до візиту це не критично.
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+# Два запуски одночасно нешкідливі (задачі забираються атомарно), але й
+# не потрібні: зайві виклики просто витрачають ліміт функцій Vercel.
+concurrency:
+  group: reminders
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Розіслати те, чий час настав
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "::error::Не задано секрети APP_URL або CRON_SECRET"
+            exit 1
+          fi
+
+          response=$(curl --silent --show-error --fail-with-body \
+            --max-time 90 \
+            --header "Authorization: Bearer $CRON_SECRET" \
+            "$APP_URL/api/cron/reminders")
+
+          echo "$response"

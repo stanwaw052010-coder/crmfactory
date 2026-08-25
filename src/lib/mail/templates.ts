@@ -116,3 +116,183 @@ export function testEmailHtml(name: string, appUrl: string): string {
     appUrl,
   );
 }
+
+/**
+ * Листи про запис — підтвердження і нагадування.
+ *
+ * Час форматується В UTC — і це навмисно, а не недогляд.
+ *
+ * У базі час візиту лежить настінним годинником салону: клієнт обрав
+ * 09:00, у колонці `2026-08-27T09:00:00.000Z`. Це не дев'ята за Гринвічем,
+ * це «дев'ята на годиннику в салоні». Читання в UTC повертає рівно ті
+ * цифри, які людина бачила на сторінці запису, — а розбіжність між листом
+ * і сторінкою гірша за будь-яку теоретичну правильність.
+ *
+ * Там, де час іде у ЗОВНІШНЮ систему (файл календаря), наївного читання
+ * замало: там викликається `wallClockToUtc`, бо календар клієнта тлумачить
+ * позначку буквально.
+ */
+
+type AppointmentMail = {
+  businessName: string;
+  clientName: string;
+  service: string;
+  employee: string;
+  startAt: Date;
+  appUrl: string;
+  address?: string | null;
+  mapsUrl?: string | null;
+  phone?: string | null;
+  priceLabel?: string | null;
+  /** false → салон ще має підтвердити запис вручну. */
+  confirmed?: boolean;
+};
+
+function formatDay(date: Date): string {
+  return new Intl.DateTimeFormat("uk-UA", {
+    timeZone: "UTC",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(date);
+}
+
+function formatTime(date: Date): string {
+  return new Intl.DateTimeFormat("uk-UA", {
+    timeZone: "UTC",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+/** Рядок «Послуга — Манікюр» у таблиці листа. */
+function row(label: string, value: string): string {
+  return `<tr>
+  <td style="padding:0 0 6px 0;font-size:13px;color:#64748b;width:96px;vertical-align:top;">${escapeHtml(label)}</td>
+  <td style="padding:0 0 6px 0;font-size:14px;color:#0f172a;">${value}</td>
+</tr>`;
+}
+
+function detailsBlock(params: AppointmentMail): string {
+  const rows = [
+    row("Послуга", escapeHtml(params.service)),
+    row("Майстер", escapeHtml(params.employee)),
+  ];
+
+  if (params.priceLabel) rows.push(row("Вартість", escapeHtml(params.priceLabel)));
+
+  if (params.address) {
+    const address = escapeHtml(params.address);
+    rows.push(
+      row(
+        "Адреса",
+        params.mapsUrl
+          ? `<a href="${encodeURI(params.mapsUrl)}" style="color:#2563eb;text-decoration:none;">${address}</a>`
+          : address,
+      ),
+    );
+  }
+
+  if (params.phone) {
+    const phone = escapeHtml(params.phone);
+    rows.push(
+      row("Телефон", `<a href="tel:${phone}" style="color:#2563eb;text-decoration:none;">${phone}</a>`),
+    );
+  }
+
+  return `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 20px 0;">
+  ${rows.join("\n  ")}
+</table>`;
+}
+
+function whenBlock(params: AppointmentMail): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 20px 0;background:#f6f8fc;border-radius:12px;">
+  <tr>
+    <td style="padding:16px 18px;">
+      <div style="font-size:13px;color:#64748b;margin:0 0 2px 0;">${escapeHtml(formatDay(params.startAt))}</div>
+      <div style="font-size:28px;font-weight:600;letter-spacing:-0.02em;color:#0f172a;">${escapeHtml(formatTime(params.startAt))}</div>
+    </td>
+  </tr>
+</table>`;
+}
+
+function plainDetails(params: AppointmentMail): string[] {
+  const lines = [
+    `${formatDay(params.startAt)}, ${formatTime(params.startAt)}`,
+    `Послуга: ${params.service}`,
+    `Майстер: ${params.employee}`,
+  ];
+  if (params.priceLabel) lines.push(`Вартість: ${params.priceLabel}`);
+  if (params.address) lines.push(`Адреса: ${params.address}`);
+  if (params.mapsUrl) lines.push(`На мапі: ${params.mapsUrl}`);
+  if (params.phone) lines.push(`Телефон: ${params.phone}`);
+  return lines;
+}
+
+export function appointmentConfirmationEmail(params: AppointmentMail): {
+  subject: string;
+  html: string;
+  text: string;
+} {
+  const pending = params.confirmed === false;
+  const title = pending ? "Заявку прийнято" : "Ви записані";
+  const lead = pending
+    ? `${escapeHtml(params.businessName)} отримав вашу заявку. Ми зв'яжемося з вами, щоб підтвердити час.`
+    : `Чекаємо на вас у ${escapeHtml(params.businessName)}.`;
+
+  const body = `
+<p style="margin:0 0 20px 0;font-size:15px;line-height:1.6;color:#334155;">${lead}</p>
+${whenBlock(params)}
+${detailsBlock(params)}
+<p style="margin:0;font-size:13px;line-height:1.6;color:#64748b;">
+  Плани змінилися? Зателефонуйте нам${params.phone ? "" : " — контакти є на сторінці салону"}, і ми перенесемо запис.
+</p>`;
+
+  const text = [
+    pending
+      ? `${params.businessName} отримав вашу заявку. Ми зв'яжемося з вами, щоб підтвердити час.`
+      : `Чекаємо на вас у ${params.businessName}.`,
+    "",
+    ...plainDetails(params),
+    "",
+    "Плани змінилися? Зателефонуйте нам, і ми перенесемо запис.",
+  ].join("\n");
+
+  return {
+    subject: pending
+      ? `Заявку прийнято — ${params.businessName}`
+      : `Ви записані: ${formatDay(params.startAt)}, ${formatTime(params.startAt)}`,
+    html: shell(title, body, params.appUrl),
+    text,
+  };
+}
+
+export function appointmentReminderEmail(params: AppointmentMail): {
+  subject: string;
+  html: string;
+  text: string;
+} {
+  const body = `
+<p style="margin:0 0 20px 0;font-size:15px;line-height:1.6;color:#334155;">
+  ${escapeHtml(params.clientName || "Вітаємо")}, нагадуємо про ваш запис у ${escapeHtml(params.businessName)}.
+</p>
+${whenBlock(params)}
+${detailsBlock(params)}
+<p style="margin:0;font-size:13px;line-height:1.6;color:#64748b;">
+  Якщо не встигаєте — попередьте нас, будь ласка, заздалегідь. Ми звільнимо час для іншого клієнта.
+</p>`;
+
+  const text = [
+    `${params.clientName || "Вітаємо"}, нагадуємо про ваш запис у ${params.businessName}.`,
+    "",
+    ...plainDetails(params),
+    "",
+    "Якщо не встигаєте — попередьте нас, будь ласка, заздалегідь.",
+  ].join("\n");
+
+  return {
+    subject: `Нагадування: ${formatDay(params.startAt)}, ${formatTime(params.startAt)}`,
+    html: shell("Нагадуємо про запис", body, params.appUrl),
+    text,
+  };
+}
