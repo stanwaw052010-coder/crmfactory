@@ -43,6 +43,24 @@ function model(): string {
   return process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_MODEL;
 }
 
+/**
+ * Чи приймає модель адаптивне мислення та `effort`.
+ *
+ * Це не косметика: моделі до 4.6 відхиляють обидва параметри з кодом 400.
+ * Haiku 4.5 і Sonnet 4.5 — саме такі, і запит до них із `thinking:
+ * adaptive` просто не проходить. Тобто вибір моделі змінює ФОРМУ запиту,
+ * а не лише її назву.
+ *
+ * Перелік навмисно позитивний: невідома модель означає «не надсилати».
+ * Запит без цих параметрів працює завжди, тож нова модель у гіршому разі
+ * втратить мислення — але не зламається. Помилятися краще в цей бік.
+ */
+const ADAPTIVE_THINKING = /^claude-(opus|sonnet|fable|mythos)-(5|4-6|4-7|4-8)\b/;
+
+export function supportsAdaptiveThinking(modelId: string): boolean {
+  return ADAPTIVE_THINKING.test(modelId.trim());
+}
+
 function systemPrompt(params: { businessName: string; currency: string; today: string }) {
   return [
     `Ти — factory AI, вбудований помічник CRM-системи crm.factory для салону «${params.businessName}».`,
@@ -113,13 +131,20 @@ export async function askAssistant(params: {
 
   try {
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+      const modelId = model();
+
       const response = await client.messages.create({
-        model: model(),
+        model: modelId,
         max_tokens: 4096,
         // Питання про бізнес майже завжди вимагають зіставити кілька
-        // показників, тож адаптивне мислення тут доречне.
-        thinking: { type: "adaptive" },
-        output_config: { effort: "medium" },
+        // показників, тож адаптивне мислення тут доречне — але лише там,
+        // де модель його приймає. Старіші відхиляють ці поля з 400.
+        ...(supportsAdaptiveThinking(modelId)
+          ? {
+              thinking: { type: "adaptive" as const },
+              output_config: { effort: "medium" as const },
+            }
+          : {}),
         // Кешування незмінної частини запиту.
         //
         // Порядок складання запиту — tools → system → messages, тож
@@ -162,7 +187,7 @@ export async function askAssistant(params: {
           .trim();
 
         console.info(
-          `[factory-ai] ${model()} · звернень ${round + 1} · вхід ${usage.input} · ` +
+          `[factory-ai] ${modelId} · звернень ${round + 1} · вхід ${usage.input} · ` +
             `вихід ${usage.output} · кеш записано ${usage.cacheWrite} · ` +
             `кеш прочитано ${usage.cacheRead}`,
         );
@@ -209,6 +234,22 @@ export async function askAssistant(params: {
     }
     if (error instanceof Anthropic.RateLimitError) {
       return { ok: false, error: "Забагато запитів до AI. Спробуйте за хвилину." };
+    }
+    if (error instanceof Anthropic.BadRequestError) {
+      // 400 — це майже завжди неправильна конфігурація, а не збій: модель
+      // не приймає якесь поле або в ANTHROPIC_MODEL описка. «Спробуйте
+      // пізніше» тут відверта неправда: без втручання воно не мине.
+      console.error("[factory-ai] запит відхилено", error.message);
+      return {
+        ok: false,
+        error: `Запит відхилено: ${error.message.slice(0, 300)}`,
+      };
+    }
+    if (error instanceof Anthropic.NotFoundError) {
+      return {
+        ok: false,
+        error: `Модель «${model()}» не існує. Перевірте ANTHROPIC_MODEL у змінних середовища.`,
+      };
     }
     if (error instanceof Anthropic.APIError) {
       console.error("[factory-ai] помилка API", error.status, error.message);
