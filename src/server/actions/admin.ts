@@ -115,6 +115,14 @@ export async function sendTestEmailAction(
     const input = testEmailSchema.parse({ to: formData.get("to") });
     const status = mailStatus();
 
+    // Зламану адресу відправника ловимо до звернення в Resend: інакше
+    // у відповідь прилетить 422 без пояснення, що саме не так.
+    if (!status.senderValid) {
+      return fail(
+        `MAIL_FROM містить некоректну адресу: ${status.from}. Потрібен формат «Назва <email@ваш-домен.com>» із повним доменом.`,
+      );
+    }
+
     if (!status.configured) {
       return fail(
         "RESEND_API_KEY не задано — лист піде в лог сервера, а не адресату. Додайте ключ у змінні середовища й перезапустіть деплой.",

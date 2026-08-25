@@ -130,6 +130,8 @@ export default async function AdminPage() {
           configured={mail.configured}
           from={mail.from}
           sandboxSender={mail.sandboxSender}
+          senderValid={mail.senderValid}
+          senderDomain={mail.senderDomain}
           defaultTo={superAdmin.email}
         />
 

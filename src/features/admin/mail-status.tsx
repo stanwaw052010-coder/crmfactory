@@ -12,19 +12,34 @@ export type MailStatusProps = {
   configured: boolean;
   from: string;
   sandboxSender: boolean;
+  senderValid: boolean;
+  senderDomain: string | null;
   defaultTo: string;
 };
 
-export function MailStatusCard({ configured, from, sandboxSender, defaultTo }: MailStatusProps) {
+export function MailStatusCard({
+  configured,
+  from,
+  sandboxSender,
+  senderValid,
+  senderDomain,
+  defaultTo,
+}: MailStatusProps) {
   const [state, formAction] = useActionState(sendTestEmailAction, null);
 
-  const tone = !configured
-    ? { border: "var(--danger)", bg: "var(--danger-soft)", fg: "var(--danger)" }
-    : sandboxSender
-      ? { border: "var(--warning)", bg: "var(--warning-soft)", fg: "var(--warning)" }
-      : { border: "var(--success)", bg: "var(--success-soft)", fg: "var(--success)" };
+  // Порядок важливий: зламану адресу відправника показуємо раніше за
+  // все інше — з нею не спрацює навіть правильно налаштований ключ.
+  const level = !senderValid ? "broken" : !configured ? "off" : sandboxSender ? "sandbox" : "ok";
 
-  const StatusIcon = !configured ? AlertTriangle : sandboxSender ? TriangleAlert : CheckCircle2;
+  const tone =
+    level === "ok"
+      ? { border: "var(--success)", bg: "var(--success-soft)", fg: "var(--success)" }
+      : level === "sandbox"
+        ? { border: "var(--warning)", bg: "var(--warning-soft)", fg: "var(--warning)" }
+        : { border: "var(--danger)", bg: "var(--danger-soft)", fg: "var(--danger)" };
+
+  const StatusIcon =
+    level === "ok" ? CheckCircle2 : level === "sandbox" ? TriangleAlert : AlertTriangle;
 
   return (
     <Card>
@@ -40,7 +55,19 @@ export function MailStatusCard({ configured, from, sandboxSender, defaultTo }: M
         >
           <StatusIcon className="mt-0.5 h-4 w-4 shrink-0" style={{ color: tone.fg }} />
           <div className="min-w-0 space-y-1">
-            {!configured ? (
+            {level === "broken" ? (
+              <>
+                <p className="text-[13px] font-medium" style={{ color: tone.fg }}>
+                  Адреса відправника некоректна
+                </p>
+                <p className="text-[12.5px] leading-relaxed" style={{ color: tone.fg }}>
+                  У <code className="font-mono">MAIL_FROM</code> зараз{" "}
+                  <code className="font-mono">{from}</code>. Потрібен формат{" "}
+                  <code className="font-mono">Назва &lt;email@ваш-домен.com&gt;</code> — з повним
+                  доменом, який підтверджено в Resend. Жоден лист із такою адресою не піде.
+                </p>
+              </>
+            ) : level === "off" ? (
               <>
                 <p className="text-[13px] font-medium" style={{ color: tone.fg }}>
                   Листи не відправляються
@@ -50,7 +77,7 @@ export function MailStatusCard({ configured, from, sandboxSender, defaultTo }: M
                   на відновлення пароля друкуються в лог сервера — клієнт їх не отримає.
                 </p>
               </>
-            ) : sandboxSender ? (
+            ) : level === "sandbox" ? (
               <>
                 <p className="text-[13px] font-medium" style={{ color: tone.fg }}>
                   Тестовий відправник
@@ -68,6 +95,13 @@ export function MailStatusCard({ configured, from, sandboxSender, defaultTo }: M
                 </p>
                 <p className="text-[12.5px] leading-relaxed" style={{ color: tone.fg }}>
                   Відправник: <code className="font-mono">{from}</code>
+                  {senderDomain && (
+                    <>
+                      {" "}
+                      — домен <code className="font-mono">{senderDomain}</code> має бути
+                      підтверджений у Resend.
+                    </>
+                  )}
                 </p>
               </>
             )}

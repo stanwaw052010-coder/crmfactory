@@ -22,16 +22,45 @@ export type MailStatus = {
   from: string;
   /** Пісочниця Resend: листи йдуть ЛИШЕ на адресу власника акаунта. */
   sandboxSender: boolean;
+  /** MAIL_FROM розібрано і адреса схожа на справжню. */
+  senderValid: boolean;
+  /** Домен відправника — його і треба підтвердити в Resend. */
+  senderDomain: string | null;
 };
 
 const SANDBOX_DOMAIN = "resend.dev";
 
+/**
+ * Витягує email із `Назва <email@домен>` або з голої адреси.
+ *
+ * Перевірка потрібна саме тут, а не лише в Resend: помилка в MAIL_FROM
+ * (найчастіше — обрізаний домен, `noreply@business` замість
+ * `noreply@mysite.business`) інакше спливе аж у момент, коли клієнт не
+ * отримає листа про пароль.
+ */
+function parseSender(value: string): { email: string | null; domain: string | null } {
+  const angled = value.match(/<([^>]+)>/);
+  const email = (angled ? angled[1] : value).trim();
+
+  // Локальна частина, @, домен із крапкою та TLD хоча б із двох літер.
+  if (!/^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(email)) return { email: null, domain: null };
+
+  const domain = email.slice(email.lastIndexOf("@") + 1).toLowerCase();
+  if (!/\.[a-z]{2,}$/.test(domain)) return { email: null, domain: null };
+
+  return { email, domain };
+}
+
 export function mailStatus(): MailStatus {
   const from = fromAddress();
+  const { email, domain } = parseSender(from);
+
   return {
     configured: mailEnabled(),
     from,
-    sandboxSender: from.includes(SANDBOX_DOMAIN),
+    sandboxSender: domain === SANDBOX_DOMAIN,
+    senderValid: email !== null,
+    senderDomain: domain,
   };
 }
 
