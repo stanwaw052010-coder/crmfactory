@@ -13,6 +13,9 @@ import {
 } from "lucide-react";
 import { requireAuth, ownEmployeeFilter } from "@/lib/auth/context";
 import { getDashboardData, getRevenueSeries } from "@/server/queries/dashboard";
+import { getDailyBriefing } from "@/server/queries/briefing";
+import { getBusinessHealth } from "@/server/queries/health";
+import { getFollowUps } from "@/server/queries/follow-ups";
 import { AnimatedMoney, AnimatedNumber } from "@/components/shared/animated-number";
 import { StatCard } from "@/components/shared/stat-card";
 import { Card, CardHeader, CardBody } from "@/components/ui/card";
@@ -21,6 +24,9 @@ import { Avatar } from "@/components/ui/avatar";
 import { SkeletonStats, SkeletonList } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TodaySchedule } from "@/features/dashboard/today-schedule";
+import { DailyBriefing } from "@/features/dashboard/daily-briefing";
+import { BusinessHealth } from "@/features/dashboard/business-health";
+import { FollowUps } from "@/features/dashboard/follow-ups";
 import { RevenueChart } from "@/components/charts/revenue-chart";
 import { HorizontalBars } from "@/components/charts/horizontal-bars";
 import { ClientStatusBadge } from "@/components/shared/status";
@@ -89,17 +95,43 @@ function DashboardSkeleton() {
 async function DashboardContent() {
   const ctx = await requireAuth();
   const employeeFilter = ownEmployeeFilter(ctx);
-  const [data, revenueSeries] = await Promise.all([
+  const canSeeBusiness = ctx.permissions.has("analytics.view");
+
+  const [data, revenueSeries, briefing, health, followUps] = await Promise.all([
     getDashboardData(ctx.organization.id, employeeFilter),
     getRevenueSeries(ctx.organization.id, 14),
+    getDailyBriefing(ctx.organization.id, employeeFilter),
+    // Стан бізнесу і список на повернення бачить той, кому взагалі
+    // відкрита аналітика: це зведення по всьому салону, а не по своїх
+    // записах, і рядовому майстру воно не належить.
+    canSeeBusiness ? getBusinessHealth(ctx.organization.id) : null,
+    canSeeBusiness
+      ? getFollowUps(ctx.organization.id, ctx.organization.name)
+      : Promise.resolve([]),
   ]);
 
   const { stats } = data;
   const currency = ctx.organization.currency;
   const hasAnyData = stats.totalClients > 0 || data.todayAppointments.length > 0;
 
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+
   return (
     <div className="space-y-6">
+      <DailyBriefing
+        name={ctx.user.name.split(" ")[0]}
+        currency={currency}
+        serverNow={briefing.generatedAt}
+        data={{
+          appointments: briefing.appointments,
+          expectedCents: briefing.expectedCents,
+          newClients: briefing.newClients,
+          cancelled: briefing.cancelled,
+          gaps: briefing.gaps,
+          bookingUrl: `${appUrl}/book/${ctx.organization.slug}`,
+        }}
+      />
+
       <div className="stagger grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Записів сьогодні"
@@ -181,6 +213,17 @@ async function DashboardContent() {
         </div>
 
         <div className="space-y-6">
+          {health && (
+            <BusinessHealth
+              score={health.score}
+              band={health.band}
+              metrics={health.metrics}
+              windowDays={health.windowDays}
+            />
+          )}
+
+          {canSeeBusiness && followUps.length > 0 && <FollowUps items={followUps} />}
+
           <Card>
             <CardHeader title="Найближчі записи" />
             {data.upcoming.length === 0 ? (
