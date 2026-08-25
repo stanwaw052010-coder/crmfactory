@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft,
+  CalendarPlus,
   CalendarX2,
   Check,
   ChevronLeft,
@@ -12,15 +13,19 @@ import {
   Clock,
   Loader2,
   MapPin,
+  Moon,
   Phone,
   Sparkles,
+  Sun,
+  Sunrise,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Confetti, DrawnCheck } from "@/components/shared/celebrate";
 import { Avatar } from "@/components/ui/avatar";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
+import { cn, pluralUk } from "@/lib/utils";
 import { formatMoney } from "@/lib/money";
 import {
   addDays,
@@ -74,6 +79,33 @@ type Employee = {
 };
 
 const STEP_LABELS = ["Послуга", "Майстер", "Час", "Контакти"];
+
+/**
+ * Слоти по частинах дня.
+ *
+ * Тридцять кнопок поспіль клієнт не читає — він шукає очима «після роботи»
+ * або «зранку». Групування робить те саме, що робить адміністраторка по
+ * телефону: звужує вибір до частини дня, а вже потім до часу.
+ */
+const SLOT_GROUPS = [
+  { label: "Ранок", icon: Sunrise, until: 12 },
+  { label: "День", icon: Sun, until: 17 },
+  { label: "Вечір", icon: Moon, until: 24 },
+] as const;
+
+function groupSlots(slots: string[]) {
+  return SLOT_GROUPS.map((group, index) => {
+    const from = index === 0 ? 0 : SLOT_GROUPS[index - 1].until;
+    return {
+      label: group.label,
+      icon: group.icon,
+      slots: slots.filter((slot) => {
+        const hour = Number.parseInt(slot.slice(0, 2), 10);
+        return hour >= from && hour < group.until;
+      }),
+    };
+  }).filter((group) => group.slots.length > 0);
+}
 
 export function BookingFlow({
   organization,
@@ -214,16 +246,14 @@ export function BookingFlow({
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-          className="card p-8 text-center"
+          className="card relative overflow-hidden p-8 text-center"
         >
-          <div
-            className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl text-white"
-            style={{ background: accent }}
-          >
-            <Check className="h-7 w-7" />
-          </div>
-          <h2 className="mt-5 text-[22px] font-semibold tracking-tight text-[var(--fg)]">
-            {confirmation.autoConfirmed ? "Booking confirmed ✓" : "Заявку прийнято"}
+          {confirmation.autoConfirmed && <Confetti />}
+
+          <DrawnCheck color={accent} />
+
+          <h2 className="mt-5 text-[22px] font-semibold tracking-[-0.02em] text-[var(--fg)]">
+            {confirmation.autoConfirmed ? "Вас записано" : "Заявку прийнято"}
           </h2>
           <p className="mt-2 text-[14px] text-[var(--fg-muted)]">
             {confirmation.autoConfirmed
@@ -231,7 +261,7 @@ export function BookingFlow({
               : "Ми зв'яжемось із вами, щоб підтвердити час."}
           </p>
 
-          <div className="mt-6 space-y-3 rounded-[14px] border border-[var(--border)] bg-[var(--surface-2)] p-5 text-left">
+          <div className="animate-fade-up mt-6 space-y-3 rounded-[14px] border border-[var(--border)] bg-[var(--surface-2)] p-5 text-left [animation-delay:220ms]">
             <Row label="Дата" value={formatDateUk(new Date(`${confirmation.date}T00:00:00`), { weekday: true })} />
             <Row label="Час" value={confirmation.time} />
             <Row label="Послуга" value={confirmation.serviceName} />
@@ -242,14 +272,26 @@ export function BookingFlow({
             />
           </div>
 
+          {/* Найкорисніша кнопка на цьому екрані: візит одразу лягає в
+              телефон клієнта з нагадуванням за годину — і його вже не
+              «забули». Це працює навіть без налаштованих SMS. */}
+          <a
+            href={`/api/booking/${confirmation.appointmentId}/calendar.ics`}
+            download
+            className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--border-strong)] text-[14px] font-medium text-[var(--fg)] transition-all duration-150 hover:-translate-y-px hover:bg-[var(--surface-hover)] active:translate-y-0"
+          >
+            <CalendarPlus className="h-4 w-4" />
+            Додати в календар
+          </a>
+
           <p className="mt-5 text-[13px] text-[var(--fg-muted)]">
             {organization.name}
             {organization.phone && ` · ${organization.phone}`}
           </p>
 
           <Button
-            variant="secondary"
-            className="mt-6"
+            variant="ghost"
+            className="mt-4"
             onClick={() => {
               setConfirmation(null);
               setStep(0);
@@ -272,34 +314,7 @@ export function BookingFlow({
 
   return (
     <Shell organization={organization} accent={accent}>
-      {/* Кроки */}
-      <div className="mb-6 flex items-center gap-1.5">
-        {STEP_LABELS.map((label, index) => (
-          <React.Fragment key={label}>
-            <button
-              type="button"
-              disabled={index > step}
-              onClick={() => index < step && setStep(index)}
-              className={cn(
-                "text-[12.5px] font-medium whitespace-nowrap transition-colors",
-                index === step
-                  ? "text-[var(--fg)]"
-                  : index < step
-                    ? "text-[var(--fg-muted)] hover:text-[var(--fg)]"
-                    : "text-[var(--fg-subtle)]",
-              )}
-            >
-              {label}
-            </button>
-            {index < STEP_LABELS.length - 1 && (
-              <div
-                className="h-0.5 flex-1 rounded-full transition-colors"
-                style={{ background: index < step ? accent : "var(--border)" }}
-              />
-            )}
-          </React.Fragment>
-        ))}
-      </div>
+      <BookingSteps step={step} accent={accent} onJump={setStep} />
 
       <AnimatePresence mode="wait">
         <motion.div
@@ -314,7 +329,7 @@ export function BookingFlow({
               <h2 className="mb-4 text-[18px] font-semibold tracking-tight text-[var(--fg)]">
                 Виберіть послугу
               </h2>
-              <div className="space-y-2.5">
+              <div className="stagger space-y-2.5">
                 {services.map((item) => (
                   <button
                     key={item.id}
@@ -325,10 +340,10 @@ export function BookingFlow({
                       setDateKey(null);
                       setStep(1);
                     }}
-                    className="card flex w-full items-center gap-4 p-4 text-left transition-shadow hover:shadow-[var(--shadow-lift)]"
+                    className="card group flex w-full items-center gap-4 p-4 text-left transition-all duration-200 ease-[var(--ease-out-expo)] hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-lift)]"
                   >
                     <span
-                      className="h-11 w-1 shrink-0 rounded-full"
+                      className="h-11 w-1 shrink-0 rounded-full transition-all duration-200 ease-[var(--ease-out-expo)] group-hover:h-14 group-hover:w-1.5"
                       style={{ background: item.color }}
                       aria-hidden
                     />
@@ -349,7 +364,7 @@ export function BookingFlow({
                     <span className="shrink-0 text-[15px] font-semibold" style={{ color: accent }}>
                       {formatMoney(item.priceCents, organization.currency)}
                     </span>
-                    <ChevronRight className="h-4 w-4 shrink-0 text-[var(--fg-subtle)]" />
+                    <ChevronRight className="h-4 w-4 shrink-0 text-[var(--fg-subtle)] transition-transform duration-200 group-hover:translate-x-0.5" />
                   </button>
                 ))}
               </div>
@@ -372,7 +387,7 @@ export function BookingFlow({
                   />
                 </div>
               ) : (
-                <div className="space-y-2.5">
+                <div className="stagger space-y-2.5">
                   {eligibleEmployees.map((item) => (
                     <button
                       key={item.id}
@@ -382,7 +397,7 @@ export function BookingFlow({
                         setDateKey(null);
                         setStep(2);
                       }}
-                      className="card flex w-full items-center gap-3.5 p-4 text-left transition-shadow hover:shadow-[var(--shadow-lift)]"
+                      className="card group flex w-full items-center gap-3.5 p-4 text-left transition-all duration-200 ease-[var(--ease-out-expo)] hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-lift)]"
                     >
                       <Avatar name={item.name} src={item.avatarUrl} color={item.color} size="md" />
                       <span className="min-w-0 flex-1">
@@ -393,7 +408,7 @@ export function BookingFlow({
                           {item.position ?? "Спеціаліст"}
                         </span>
                       </span>
-                      <ChevronRight className="h-4 w-4 shrink-0 text-[var(--fg-subtle)]" />
+                      <ChevronRight className="h-4 w-4 shrink-0 text-[var(--fg-subtle)] transition-transform duration-200 group-hover:translate-x-0.5" />
                     </button>
                   ))}
                 </div>
@@ -500,22 +515,37 @@ export function BookingFlow({
                       />
                     </div>
                   ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {slots.map((slot) => (
-                        <button
-                          key={slot}
-                          type="button"
-                          onClick={() => setTime(slot)}
-                          className={cn(
-                            "rounded-xl border px-4 py-2.5 text-[13.5px] font-medium transition-colors",
-                            time === slot
-                              ? "border-transparent text-white"
-                              : "border-[var(--border)] bg-[var(--surface)] text-[var(--fg)] hover:border-[var(--border-strong)]",
-                          )}
-                          style={time === slot ? { background: accent } : undefined}
-                        >
-                          {slot}
-                        </button>
+                    <div className="space-y-4">
+                      {groupSlots(slots).map((group) => (
+                        <div key={group.label}>
+                          <p className="mb-2 flex items-center gap-1.5 text-[11.5px] font-medium tracking-wide text-[var(--fg-subtle)] uppercase">
+                            <group.icon className="h-3.5 w-3.5" />
+                            {group.label}
+                            <span className="font-normal normal-case">
+                              · {group.slots.length}{" "}
+                              {pluralUk(group.slots.length, "місце", "місця", "місць")}
+                            </span>
+                          </p>
+                          <div className="stagger flex flex-wrap gap-2">
+                            {group.slots.map((slot) => (
+                              <button
+                                key={slot}
+                                type="button"
+                                onClick={() => setTime(slot)}
+                                className={cn(
+                                  "rounded-xl border px-4 py-2.5 text-[13.5px] font-medium tabular-nums",
+                                  "transition-all duration-200 ease-[var(--ease-out-expo)]",
+                                  time === slot
+                                    ? "border-transparent text-white shadow-[var(--shadow-lift)]"
+                                    : "border-[var(--border)] bg-[var(--surface)] text-[var(--fg)] hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-soft)]",
+                                )}
+                                style={time === slot ? { background: accent } : undefined}
+                              >
+                                {slot}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                       ))}
                     </div>
                   )}
@@ -603,6 +633,87 @@ export function BookingFlow({
         </motion.div>
       </AnimatePresence>
     </Shell>
+  );
+}
+
+/**
+ * Індикатор кроків.
+ *
+ * Пройдені кроки позначаються галочкою і лишаються клікабельними —
+ * повернутися й змінити послугу можна з будь-якого місця, не втрачаючи
+ * решту вибору. З'єднувальна лінія заповнюється, а не просто перефарбовується:
+ * видно напрямок руху.
+ */
+function BookingSteps({
+  step,
+  accent,
+  onJump,
+}: {
+  step: number;
+  accent: string;
+  onJump: (index: number) => void;
+}) {
+  return (
+    <div className="mb-6 flex items-center">
+      {STEP_LABELS.map((label, index) => {
+        const done = index < step;
+        const current = index === step;
+
+        return (
+          <React.Fragment key={label}>
+            <button
+              type="button"
+              disabled={index > step}
+              onClick={() => done && onJump(index)}
+              aria-current={current ? "step" : undefined}
+              className={cn(
+                "group flex shrink-0 items-center gap-2",
+                done && "cursor-pointer",
+                index > step && "cursor-default",
+              )}
+            >
+              <span
+                className={cn(
+                  "flex h-6 w-6 items-center justify-center rounded-full text-[11.5px] font-semibold",
+                  "transition-all duration-300 ease-[var(--ease-spring)]",
+                  done || current ? "text-white" : "text-[var(--fg-subtle)]",
+                  !done && !current && "border border-[var(--border-strong)]",
+                  done && "group-hover:scale-110",
+                )}
+                style={done || current ? { background: accent } : undefined}
+              >
+                {done ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : index + 1}
+              </span>
+              <span
+                className={cn(
+                  "hidden text-[12.5px] font-medium whitespace-nowrap transition-colors sm:block",
+                  current
+                    ? "text-[var(--fg)]"
+                    : done
+                      ? "text-[var(--fg-muted)] group-hover:text-[var(--fg)]"
+                      : "text-[var(--fg-subtle)]",
+                )}
+              >
+                {label}
+              </span>
+            </button>
+
+            {index < STEP_LABELS.length - 1 && (
+              <div className="mx-2 h-0.5 flex-1 overflow-hidden rounded-full bg-[var(--border)]">
+                <div
+                  className="h-full rounded-full transition-transform duration-500 ease-[var(--ease-out-expo)]"
+                  style={{
+                    background: accent,
+                    transform: `scaleX(${done ? 1 : 0})`,
+                    transformOrigin: "left",
+                  }}
+                />
+              </div>
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
   );
 }
 

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/prisma";
+import { pluralUk } from "@/lib/utils";
 import { requirePermission, requireAuth } from "@/lib/auth/context";
 import { assertTenant } from "@/lib/db/tenant";
 import {
@@ -59,7 +60,8 @@ export async function createEmployeeAction(
       if (active >= limit) {
         return fail(
           `На тарифі ${PLAN_LABELS[ctx.organization.plan as Plan]} доступно ${limit} ` +
-            `${limit === 1 ? "співробітник" : "співробітників"}. Перейдіть на вищий тариф у Налаштуваннях → Тариф.`,
+            `${pluralUk(limit, "співробітник", "співробітники", "співробітників")}. ` +
+            "Перейдіть на вищий тариф у Налаштуваннях → Тариф.",
         );
       }
     }

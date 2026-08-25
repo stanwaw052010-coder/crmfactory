@@ -51,3 +51,21 @@ export function deltaPercent(current: number, previous: number): number | null {
   if (previous === 0) return current === 0 ? 0 : null;
   return Math.round(((current - previous) / previous) * 100);
 }
+
+/**
+ * Українська множина: 1 запис / 2 записи / 5 записів.
+ *
+ * Правило складніше за англійське «одне чи не одне», і саме на ньому
+ * інтерфейси видають машинний переклад: «3 місць» замість «3 місця».
+ * Форму визначають дві останні цифри — 11–14 завжди беруть третю форму,
+ * попри те, що закінчуються на 1–4.
+ */
+export function pluralUk(count: number, one: string, few: string, many: string): string {
+  const abs = Math.abs(count) % 100;
+  if (abs >= 11 && abs <= 14) return many;
+
+  const last = abs % 10;
+  if (last === 1) return one;
+  if (last >= 2 && last <= 4) return few;
+  return many;
+}

@@ -387,6 +387,32 @@ body {
   100% { opacity: 0; transform: scale(2.4); }
 }
 
+/* Конфеті: політ угору, потім падіння з обертанням і зникненням. */
+@keyframes confetti-fall {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -10px, 0) rotate(0deg);
+  }
+  10% { opacity: 1; }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--confetti-drift, 0), 340px, 0)
+      rotate(var(--confetti-rotate, 360deg));
+  }
+}
+
+/* Коло під галочкою «вистрілює» з пружиною. */
+@keyframes pop-in {
+  0% { opacity: 0; transform: scale(0.3); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* Сама галочка домальовується — довжина шляху ≈ 32. */
+@keyframes draw-check {
+  from { stroke-dasharray: 32; stroke-dashoffset: 32; }
+  to { stroke-dasharray: 32; stroke-dashoffset: 0; }
+}
+
 .animate-fade-in { animation: fade-in 0.18s ease-out both; }
 .animate-fade-up { animation: fade-up 0.24s var(--ease-out-expo) both; }
 .animate-scale-in { animation: scale-in 0.18s var(--ease-out-expo) both; }
@@ -395,6 +421,9 @@ body {
 .animate-rise-in { animation: rise-in 0.32s var(--ease-out-expo) both; }
 .animate-drift { animation: drift 22s ease-in-out infinite; }
 .animate-ring-out { animation: ring-out 2s ease-out infinite; }
+.animate-confetti { animation-name: confetti-fall; animation-timing-function: cubic-bezier(0.3, 0.8, 0.6, 1); animation-fill-mode: both; }
+.animate-pop-in { animation: pop-in 0.4s var(--ease-spring) both; }
+.animate-draw-check { animation: draw-check 0.4s var(--ease-out-expo) 0.22s both; }
 
 /**
  * Каскадна поява дітей.

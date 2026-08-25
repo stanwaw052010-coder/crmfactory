@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Field, Select, Switch } from "@/components/ui/input";
 import { SubmitButton } from "@/components/shared/submit-button";
 import { useToast } from "@/components/ui/toast";
-import { cn } from "@/lib/utils";
+import { cn, pluralUk } from "@/lib/utils";
 import { updateNotificationSettingsAction } from "@/server/actions/settings";
 import type { ReminderChannel } from "@prisma/client";
 
@@ -106,7 +106,7 @@ export function NotificationsForm({
             <Select name="reminderHoursBefore" defaultValue={String(settings.reminderHoursBefore)}>
               {[1, 2, 3, 6, 12, 24, 48].map((hours) => (
                 <option key={hours} value={hours}>
-                  За {hours} {hours === 1 ? "годину" : hours < 5 ? "години" : "годин"} до візиту
+                  За {hours} {pluralUk(hours, "годину", "години", "годин")} до візиту
                 </option>
               ))}
             </Select>
