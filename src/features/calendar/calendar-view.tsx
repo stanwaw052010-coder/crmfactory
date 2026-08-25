@@ -54,10 +54,14 @@ export function CalendarView(props: {
   const [editing, setEditing] = React.useState<CalendarAppointment | null>(null);
   const [detailsId, setDetailsId] = React.useState<string | null>(props.openAppointmentId);
   const [modalOpen, setModalOpen] = React.useState(props.openNew);
+  // Дата, час і клієнт можуть прийти з адреси — так працює команда
+  // «запис для Анни завтра о 15:00» з ⌘K: вона просто відкриває цю
+  // сторінку з готовими параметрами.
   const [defaults, setDefaults] = React.useState({
-    date: props.dateKey,
-    time: "10:00",
+    date: searchParams.get("date") ?? props.dateKey,
+    time: searchParams.get("time") ?? "10:00",
     employeeId: undefined as string | undefined,
+    clientQuery: searchParams.get("q") ?? undefined,
   });
   // Оптимістичні позиції під час drag & drop: UI не чекає на сервер.
   const [optimistic, setOptimistic] = React.useState<
@@ -148,6 +152,7 @@ export function CalendarView(props: {
       date: toDateKey(date),
       time: minute != null ? minutesToTime(minute) : "10:00",
       employeeId,
+      clientQuery: undefined,
     });
     setModalOpen(true);
   };
@@ -295,7 +300,9 @@ export function CalendarView(props: {
         onClose={() => {
           setModalOpen(false);
           setEditing(null);
-          if (searchParams.get("new")) setParams({ new: null });
+          if (searchParams.get("new")) {
+            setParams({ new: null, date: null, time: null, q: null });
+          }
         }}
         onSaved={() => router.refresh()}
         appointment={editing}

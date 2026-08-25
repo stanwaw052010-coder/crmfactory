@@ -147,12 +147,15 @@ async function main() {
     },
   });
 
+  // Демо-салон на PRO: він показує систему знайомим і потенційним
+  // клієнткам, тож у ньому має бути видно всі можливості, включно з
+  // factory AI. На нижчих тарифах асистент пропонує апгрейд.
   await prisma.subscription.create({
     data: {
       organizationId: organization.id,
-      plan: "BUSINESS",
+      plan: "PRO",
       status: "ACTIVE",
-      priceCents: 3900,
+      priceCents: 5900,
       seats: 10,
       currentPeriodStart: daysAgo(12, 0),
       currentPeriodEnd: daysAgo(-18, 0),

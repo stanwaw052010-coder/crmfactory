@@ -85,7 +85,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <MobileNav permissions={permissions} />
       <CommandMenu permissions={permissions} />
       <KeyboardShortcuts permissions={permissions} />
-      {ctx.permissions.has("analytics.view") && <AssistantPanel enabled={aiEnabled()} />}
+      <AssistantPanel
+        enabled={aiEnabled()}
+        allowed={ctx.permissions.has("ai.use")}
+        canSeeAnalytics={ctx.permissions.has("analytics.view")}
+      />
     </div>
   );
 }

@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDebounced } from "@/hooks/use-debounced";
+import { parseCommand } from "@/lib/command-parse";
 import { useIsClient } from "@/hooks/use-is-client";
 import { searchAction } from "@/server/actions/search";
 import type { SearchResult } from "@/server/queries/search";
@@ -129,6 +130,39 @@ export function CommandMenu({ permissions }: { permissions: string[] }) {
     return all.filter((c) => !required[c.id] || permissions.includes(required[c.id]));
   }, [permissions]);
 
+  /**
+   * Команда, розібрана з фрази: «запис для Анни завтра о 15:00».
+   *
+   * Стоїть ПЕРШОЮ у списку і одразу підсвічена, тож Enter виконує саме
+   * її. Розбір без мовної моделі — потрібна миттєва реакція на кожне
+   * натискання клавіші й повна передбачуваність (див. lib/command-parse.ts).
+   */
+  const parsed = React.useMemo(() => {
+    const command = parseCommand(query);
+    if (!command) return null;
+
+    const permission =
+      command.intent === "appointment" ? "appointment.create" : "client.create";
+    if (!permissions.includes(permission)) return null;
+
+    const params = new URLSearchParams({ new: "1" });
+    if (command.name) params.set("q", command.name);
+    if (command.date) params.set("date", command.date);
+    if (command.time) params.set("time", command.time);
+
+    return {
+      id: "parsed",
+      label: command.summary,
+      hint: "Enter — відкрити форму",
+      icon: command.intent === "appointment" ? CalendarPlus : UserPlus,
+      href:
+        command.intent === "appointment"
+          ? `/calendar?${params.toString()}`
+          : `/clients?${params.toString()}`,
+      group: "Швидка дія",
+    } satisfies Command;
+  }, [query, permissions]);
+
   const commands = React.useMemo<Command[]>(() => {
     if (query.trim().length >= 2) {
       const found: Command[] = results.map((r) => ({
@@ -142,10 +176,10 @@ export function CommandMenu({ permissions }: { permissions: string[] }) {
       const filteredNav = navCommands.filter((c) =>
         c.label.toLowerCase().includes(query.trim().toLowerCase()),
       );
-      return [...found, ...filteredNav];
+      return [...(parsed ? [parsed] : []), ...found, ...filteredNav];
     }
     return navCommands;
-  }, [query, results, navCommands]);
+  }, [query, results, navCommands, parsed]);
 
   const run = React.useCallback(
     (command: Command) => {

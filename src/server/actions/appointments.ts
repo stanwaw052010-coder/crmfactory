@@ -16,7 +16,21 @@ import {
   cancelAppointmentReminders,
   scheduleAppointmentReminders,
 } from "@/lib/reminders";
-import { combineDateTime, formatDateTimeUk, minutesOfDay, startOfDay } from "@/lib/time";
+import {
+  addDays,
+  combineDateTime,
+  endOfDay,
+  formatDateTimeUk,
+  minutesOfDay,
+  minutesToTime,
+  startOfDay,
+  toDateKey,
+} from "@/lib/time";
+import {
+  DEAD_GAP_MINUTES,
+  bestSlots,
+  type SlotCandidate,
+} from "@/lib/smart-slots";
 import { parseMoneyToCents } from "@/lib/money";
 import { freeIntervals } from "@/lib/availability";
 
@@ -434,6 +448,167 @@ export async function getFreeSlotsAction(params: {
       ignoreAppointmentId: params.ignoreAppointmentId,
     });
     return ok(slots.map((s) => s.time));
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export type SlotSuggestion = {
+  employeeId: string;
+  employeeName: string;
+  dateKey: string;
+  time: string;
+  reason: string;
+};
+
+/** Скільки днів наперед шукати. Далі клієнтки все одно не планують. */
+const SUGGEST_HORIZON_DAYS = 7;
+
+/**
+ * Найкращий час для запису — по всіх майстрах, які виконують цю послугу.
+ *
+ * Відрізняється від `getFreeSlotsAction` тим, що не просто перелічує
+ * вільне, а ранжує: враховує улюбленого майстра клієнтки і те, чи не
+ * роздрібнить цей запис день на шматки, які вже нікому не продаси
+ * (див. lib/smart-slots.ts).
+ */
+export async function suggestSlotsAction(params: {
+  serviceId: string;
+  clientId?: string;
+  fromDate?: string;
+}): Promise<ActionResult<SlotSuggestion[]>> {
+  try {
+    const ctx = await requireAuth();
+
+    const service = await prisma.service.findUnique({
+      where: { id: params.serviceId },
+      include: { employees: { select: { employeeId: true } } },
+    });
+    assertTenant(service, ctx.organization.id);
+    if (!service) return fail("Послугу не знайдено");
+
+    const employeeIds = service.employees.map((row) => row.employeeId);
+    const employees = await prisma.employee.findMany({
+      where: {
+        organizationId: ctx.organization.id,
+        isActive: true,
+        ...(employeeIds.length > 0 ? { id: { in: employeeIds } } : {}),
+      },
+      select: { id: true, name: true },
+    });
+    if (employees.length === 0) return ok([]);
+
+    // Улюблений майстер — той, до кого клієнтка ходила найчастіше.
+    let preferredEmployeeId: string | null = null;
+    if (params.clientId) {
+      const history = await prisma.appointment.groupBy({
+        by: ["employeeId"],
+        where: {
+          organizationId: ctx.organization.id,
+          clientId: params.clientId,
+          status: "COMPLETED",
+        },
+        _count: { _all: true },
+      });
+      preferredEmployeeId =
+        history.sort((a, b) => b._count._all - a._count._all)[0]?.employeeId ?? null;
+    }
+
+    // Найкоротша послуга салону задає, який хвостик уже «мертвий».
+    const shortest = await prisma.service.aggregate({
+      where: { organizationId: ctx.organization.id, isActive: true },
+      _min: { durationMin: true },
+    });
+
+    const { freeIntervals } = await import("@/lib/availability");
+    const start = startOfDay(
+      params.fromDate ? new Date(`${params.fromDate}T00:00:00`) : new Date(),
+    );
+    // Скільки днів від СЬОГОДНІ до початку пошуку. Без цього зсуву слот
+    // 26 серпня, знайдений першим, підписувався б «сьогодні» лише тому,
+    // що він перший у видачі.
+    const today = startOfDay(new Date());
+    const offsetFromToday = Math.round(
+      (start.getTime() - today.getTime()) / 86_400_000,
+    );
+
+    const candidates: SlotCandidate[] = [];
+
+    for (let dayOffset = 0; dayOffset < SUGGEST_HORIZON_DAYS; dayOffset++) {
+      const date = addDays(start, dayOffset);
+      const dateKey = toDateKey(date);
+
+      const perEmployee = await Promise.all(
+        employees.map(async (employee) => {
+          const intervals = await freeIntervals({
+            organizationId: ctx.organization.id,
+            employeeId: employee.id,
+            date,
+            durationMin: service.durationMin,
+            stepMin: 15,
+          });
+
+          const busy = await prisma.appointment.findMany({
+            where: {
+              organizationId: ctx.organization.id,
+              employeeId: employee.id,
+              status: { in: ["CONFIRMED", "WAITING", "COMPLETED"] },
+              startAt: { gte: startOfDay(date), lte: endOfDay(date) },
+            },
+            select: { startAt: true, endAt: true },
+          });
+
+          const busySpans = busy.map((row) => ({
+            startMinute: minutesOfDay(row.startAt),
+            endMinute: minutesOfDay(row.endAt),
+          }));
+
+          const rows: SlotCandidate[] = [];
+          for (const interval of intervals) {
+            // Крок 15 хвилин — той самий, що і в решті системи.
+            for (
+              let minute = interval.start;
+              minute + service.durationMin <= interval.end;
+              minute += 15
+            ) {
+              rows.push({
+                employeeId: employee.id,
+                employeeName: employee.name,
+                dateKey,
+                daysAhead: offsetFromToday + dayOffset,
+                startMinute: minute,
+                interval: { start: interval.start, end: interval.end },
+                busy: busySpans,
+              });
+            }
+          }
+          return rows;
+        }),
+      );
+
+      candidates.push(...perEmployee.flat());
+
+      // Достатньо варіантів — далі не шукаємо, щоб не ганяти БД дарма.
+      if (candidates.length >= 60) break;
+    }
+
+    const best = bestSlots(candidates, {
+      preferredEmployeeId,
+      durationMin: service.durationMin,
+      minServiceMin: shortest._min.durationMin ?? DEAD_GAP_MINUTES,
+      limit: 5,
+      perEmployee: 2,
+    });
+
+    return ok(
+      best.map((slot) => ({
+        employeeId: slot.employeeId,
+        employeeName: slot.employeeName,
+        dateKey: slot.dateKey,
+        time: minutesToTime(slot.startMinute),
+        reason: slot.reason,
+      })),
+    );
   } catch (error) {
     return toActionError(error);
   }

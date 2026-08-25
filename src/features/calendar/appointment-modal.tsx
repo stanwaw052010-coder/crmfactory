@@ -15,8 +15,11 @@ import { APPOINTMENT_STATUS_LABELS } from "@/components/shared/status";
 import {
   createAppointmentAction,
   getFreeSlotsAction,
+  suggestSlotsAction,
   updateAppointmentAction,
+  type SlotSuggestion,
 } from "@/server/actions/appointments";
+import { SlotSuggestions } from "@/features/calendar/slot-suggestions";
 import { quickCreateClientAction } from "@/server/actions/clients";
 import type {
   CalendarAppointment,
@@ -43,7 +46,7 @@ export function AppointmentModal({
   onClose: () => void;
   onSaved: () => void;
   appointment: CalendarAppointment | null;
-  defaults: { date: string; time: string; employeeId?: string };
+  defaults: { date: string; time: string; employeeId?: string; clientQuery?: string };
   clients: CalendarClient[];
   services: CalendarService[];
   employees: CalendarEmployee[];
@@ -59,8 +62,14 @@ export function AppointmentModal({
   const [state, formAction] = useActionState(action, null);
 
   const [clientId, setClientId] = React.useState("");
-  const [clientQuery, setClientQuery] = React.useState("");
-  const [showClientList, setShowClientList] = React.useState(false);
+  // Ініціалізується з defaults так само, як дата й час. Блок заповнення
+  // форми нижче спрацьовує лише на ЗМІНУ formKey, а коли модалка
+  // відкривається одразу відкритою (перехід за адресою з ⌘K), зміни
+  // немає — і значення взялося б лише звідси.
+  const [clientQuery, setClientQuery] = React.useState(defaults.clientQuery ?? "");
+  const [showClientList, setShowClientList] = React.useState(
+    Boolean(defaults.clientQuery),
+  );
   const [creatingClient, setCreatingClient] = React.useState(false);
   const [serviceId, setServiceId] = React.useState("");
   const [employeeId, setEmployeeId] = React.useState("");
@@ -71,6 +80,14 @@ export function AppointmentModal({
   const [status, setStatus] = React.useState("CONFIRMED");
   const [slots, setSlots] = React.useState<string[] | null>(null);
   const [slotsLoading, startSlots] = React.useTransition();
+  // Пропозиції зберігаються разом із послугою, для якої їх зібрано:
+  // так при зміні послуги старий список не встигає блимнути, і не
+  // доводиться чистити стан прямо в тілі ефекту.
+  const [suggestions, setSuggestions] = React.useState<{
+    serviceId: string;
+    items: SlotSuggestion[];
+  } | null>(null);
+  const [suggestLoading, startSuggest] = React.useTransition();
 
   // Наповнення форми при відкритті: редагування — з запису, створення — з дефолтів.
   // Робимо під час рендеру (документований React-патерн), а не в ефекті —
@@ -96,7 +113,10 @@ export function AppointmentModal({
       setStatus(appointment.status);
     } else {
       setClientId("");
-      setClientQuery("");
+      // Ім'я з команди ⌘K одразу лягає в пошук клієнта — залишається
+      // тільки обрати потрібного зі списку.
+      setClientQuery(defaults.clientQuery ?? "");
+      setShowClientList(Boolean(defaults.clientQuery));
       setServiceId("");
       setEmployeeId(lockedEmployeeId ?? defaults.employeeId ?? employees[0]?.id ?? "");
       setDate(defaults.date);
@@ -172,6 +192,25 @@ export function AppointmentModal({
       )
       .slice(0, 8);
   }, [clients, clientQuery]);
+
+  // Підбір найкращого часу. Тільки для НОВОГО запису: при редагуванні
+  // час уже обрано, і пропонувати інший — плутати користувача.
+  React.useEffect(() => {
+    if (!open || isEdit || !serviceId) return;
+
+    startSuggest(async () => {
+      const result = await suggestSlotsAction({
+        serviceId,
+        clientId: clientId || undefined,
+        fromDate: date,
+      });
+      setSuggestions({ serviceId, items: result.ok ? result.data : [] });
+    });
+  }, [open, isEdit, serviceId, clientId, date]);
+
+  // Показуємо лише те, що зібрано саме для поточної послуги.
+  const currentSuggestions =
+    suggestions && suggestions.serviceId === serviceId ? suggestions.items : [];
 
   const availableEmployees = React.useMemo(() => {
     const service = services.find((s) => s.id === serviceId);
@@ -334,6 +373,18 @@ export function AppointmentModal({
             </Select>
           </Field>
         </div>
+
+        {!isEdit && serviceId && (suggestLoading || currentSuggestions.length > 0) && (
+          <SlotSuggestions
+            items={currentSuggestions}
+            loading={suggestLoading}
+            onPick={(suggestion) => {
+              setDate(suggestion.dateKey);
+              setTime(suggestion.time);
+              setEmployeeId(suggestion.employeeId);
+            }}
+          />
+        )}
 
         {/* Вільні слоти */}
         {employeeId && (

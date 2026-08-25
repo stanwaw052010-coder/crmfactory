@@ -17,9 +17,9 @@ export type AskResult = { text: string; toolsUsed: string[] };
 /**
  * Питання до factory AI.
  *
- * Доступ — той самий, що до аналітики: асистент бачить зведення по всьому
- * салону, тож рядовому майстру, який має бачити лише свої записи, він
- * не належить.
+ * Доступ вимагає права `ai.use`: воно є в ролей, що бачать аналітику, і
+ * лише на тарифі PRO. Рядовому майстру, який бачить тільки свої записи,
+ * зведення по салону не належить.
  */
 export async function askFactoryAiAction(
   _prev: ActionResult<AskResult> | null,
@@ -28,8 +28,11 @@ export async function askFactoryAiAction(
   try {
     const ctx = await requireAuth();
 
-    if (!ctx.permissions.has("analytics.view")) {
-      return fail("Недостатньо прав для доступу до factory AI");
+    // `ai.use` уже враховує і роль, і тариф: у lib/auth/context.ts план
+    // застосовується ПІСЛЯ ролі й персональних дозволів, тож обійти
+    // тарифне обмеження точковим правом неможливо.
+    if (!ctx.permissions.has("ai.use")) {
+      return fail("factory AI доступний на тарифі PRO");
     }
 
     const question = String(formData.get("question") ?? "").trim();

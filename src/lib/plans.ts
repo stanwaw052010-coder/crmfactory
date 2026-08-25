@@ -67,6 +67,9 @@ const PERMISSION_MIN_PLAN: Partial<Record<Permission, Plan>> = {
   "pipeline.manage": "STARTER",
   "analytics.view": "BUSINESS",
   "team.manage": "BUSINESS",
+  // factory AI — на найвищому тарифі. Кожен запит до моделі коштує
+  // грошей власнику платформи, тож функція має окупати себе сама.
+  "ai.use": "PRO",
 };
 
 export function planAtLeast(plan: Plan, required: Plan): boolean {
@@ -112,6 +115,7 @@ export const PLAN_FEATURES: Record<Plan, string[]> = {
   PRO: [
     "Необмежена команда",
     "Усе з Business",
+    "factory AI — помічник за вашими даними",
     "Кілька філій (workspace)",
     "Пріоритетна підтримка",
   ],

@@ -18,7 +18,18 @@ const SUGGESTIONS = [
   "Хто з майстрів найзавантаженіший?",
 ];
 
-export function AssistantPanel({ enabled }: { enabled: boolean }) {
+export function AssistantPanel({
+  enabled,
+  allowed,
+  canSeeAnalytics,
+}: {
+  /** Ключ ANTHROPIC_API_KEY заданий на сервері. */
+  enabled: boolean;
+  /** Роль і тариф дозволяють користуватися асистентом. */
+  allowed: boolean;
+  /** Права на зведення по салону — без них кнопки взагалі немає. */
+  canSeeAnalytics: boolean;
+}) {
   const isClient = useIsClient();
   const [open, setOpen] = React.useState(false);
   const [turns, setTurns] = React.useState<Turn[]>([]);
@@ -69,7 +80,11 @@ export function AssistantPanel({ enabled }: { enabled: boolean }) {
     setTurns((current) => [...current, { role: "assistant", content: result.data.text }]);
   }
 
-  if (!isClient) return null;
+  // Рядовому майстру асистента не показуємо взагалі: пропонувати
+  // апгрейд тарифу тому, хто його не купує, — марно й дратує.
+  if (!isClient || !canSeeAnalytics) return null;
+
+  const usable = enabled && allowed;
 
   return createPortal(
     <>
@@ -129,7 +144,12 @@ export function AssistantPanel({ enabled }: { enabled: boolean }) {
               </header>
 
               <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
-                {!enabled ? (
+                {/* Порядок важливий: клієнтці на Starter треба показати
+                    тариф, а не пропонувати додати ключ на сервері — це
+                    взагалі не її проблема. */}
+                {!allowed ? (
+                  <NeedsPro />
+                ) : !enabled ? (
                   <NotConfigured />
                 ) : turns.length === 0 ? (
                   <Suggestions onPick={ask} />
@@ -171,13 +191,19 @@ export function AssistantPanel({ enabled }: { enabled: boolean }) {
                       }
                     }}
                     rows={1}
-                    disabled={!enabled || pending}
-                    placeholder={enabled ? "Запитайте про свій бізнес…" : "AI не налаштовано"}
+                    disabled={!usable || pending}
+                    placeholder={
+                      usable
+                        ? "Запитайте про свій бізнес…"
+                        : allowed
+                          ? "AI не налаштовано"
+                          : "Доступно на тарифі PRO"
+                    }
                     className="max-h-32 min-h-[36px] flex-1 resize-none bg-transparent px-2 py-1.5 text-[13.5px] text-[var(--fg)] placeholder:text-[var(--fg-subtle)] focus:outline-none disabled:cursor-not-allowed"
                   />
                   <button
                     type="submit"
-                    disabled={!enabled || pending || draft.trim().length === 0}
+                    disabled={!usable || pending || draft.trim().length === 0}
                     aria-label="Надіслати"
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[var(--primary)] text-white transition-all duration-150 hover:brightness-110 disabled:opacity-40"
                   >
@@ -247,6 +273,27 @@ function NotConfigured() {
         Щоб увімкнути, додайте змінну <code className="font-mono">ANTHROPIC_API_KEY</code> у
         налаштуваннях хостингу й перезапустіть деплой. Ключ видається в консолі Anthropic.
       </p>
+    </div>
+  );
+}
+
+function NeedsPro() {
+  return (
+    <div className="rounded-xl border border-[var(--primary)]/25 bg-[var(--primary-soft)] px-4 py-3.5">
+      <p className="text-[13px] font-medium text-[var(--primary)]">
+        factory AI — на тарифі PRO
+      </p>
+      <p className="mt-1 text-[12.5px] leading-relaxed text-[var(--primary)]">
+        Асистент читає ваші записи, оплати й клієнтів і відповідає числами на
+        питання простою мовою: що приносить гроші, кому пора нагадати про себе,
+        куди зникла виручка.
+      </p>
+      <a
+        href="/settings/billing"
+        className="mt-3 inline-flex h-9 items-center rounded-xl bg-[var(--primary)] px-4 text-[13px] font-medium text-white transition-transform duration-150 hover:-translate-y-px"
+      >
+        Подивитися тарифи
+      </a>
     </div>
   );
 }
