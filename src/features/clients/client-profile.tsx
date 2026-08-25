@@ -36,6 +36,7 @@ import {
 } from "@/components/shared/status";
 import { ClientModal, type ClientFormValues } from "@/features/clients/client-modal";
 import { addClientNoteAction, deleteClientNoteAction } from "@/server/actions/clients";
+import { LoyaltyCard } from "@/features/clients/loyalty-card";
 import { formatMoney } from "@/lib/money";
 import { formatDateUk, formatTime, relativeUk, toDateKey } from "@/lib/time";
 import type { AppointmentStatus, ClientStatus, PaymentStatus } from "@prisma/client";
@@ -79,6 +80,7 @@ export function ClientProfile({
   currency,
   canUpdate,
   canCreateAppointment,
+  serverNow,
 }: {
   client: {
     id: string;
@@ -103,11 +105,14 @@ export function ClientProfile({
     averageCents: number;
     cancelled: number;
     noShow: number;
+    lastVisitAt: Date | null;
   };
   nextVisit: { startAt: Date; service: { name: string }; employee: { name: string } } | null;
   currency: string;
   canUpdate: boolean;
   canCreateAppointment: boolean;
+  /** Час сервера — щоб «понад 3 місяці тому» не залежало від годинника браузера. */
+  serverNow: number;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -249,8 +254,17 @@ export function ClientProfile({
         </CardBody>
       </Card>
 
+      {/* Лояльність — те, що дані вже знають, але раніше не показували */}
+      <div className="mb-4">
+        <LoyaltyCard
+          visits={stats.visits}
+          lastVisitAt={stats.lastVisitAt}
+          now={serverNow}
+        />
+      </div>
+
       {/* Метрики */}
-      <div className="mb-6 grid gap-4 sm:grid-cols-3">
+      <div className="stagger mb-6 grid gap-4 sm:grid-cols-3">
         <MetricCard icon={Repeat} label="Всього візитів" value={String(stats.visits)} tone="brand" />
         <MetricCard
           icon={Wallet}

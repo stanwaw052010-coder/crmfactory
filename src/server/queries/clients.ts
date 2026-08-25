@@ -184,21 +184,30 @@ export async function getClientProfile(organizationId: string, clientId: string)
     }),
   ]);
 
-  const completed = appointments.filter((a) => a.status === "COMPLETED").length;
+  const completedAppointments = appointments.filter((a) => a.status === "COMPLETED");
   const totalCents = stats._sum.amountCents ?? 0;
   const paidCount = stats._count._all;
+
+  // Останній завершений візит. Скасований або no-show не рахується:
+  // «востаннє була в березні» має означати, що людина справді приходила.
+  const lastVisitAt = completedAppointments.reduce<Date | null>((latest, appointment) => {
+    if (appointment.startAt > now) return latest;
+    return !latest || appointment.startAt > latest ? appointment.startAt : latest;
+  }, null);
 
   return {
     client,
     appointments,
     payments,
     nextVisit,
+    generatedAt: now.getTime(),
     stats: {
-      visits: completed,
+      visits: completedAppointments.length,
       totalCents,
       averageCents: paidCount > 0 ? Math.round(totalCents / paidCount) : 0,
       cancelled: appointments.filter((a) => a.status === "CANCELLED").length,
       noShow: appointments.filter((a) => a.status === "NO_SHOW").length,
+      lastVisitAt,
     },
   };
 }

@@ -23,6 +23,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
       currency={ctx.organization.currency}
       canUpdate={ctx.permissions.has("client.update")}
       canCreateAppointment={ctx.permissions.has("appointment.create")}
+      serverNow={data.generatedAt}
     />
   );
 }

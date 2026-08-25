@@ -18,6 +18,7 @@ import { useDebounced } from "@/hooks/use-debounced";
 import { ClientStatusBadge } from "@/components/shared/status";
 import { ClientModal, type ClientFormValues } from "@/features/clients/client-modal";
 import { deleteClientAction } from "@/server/actions/clients";
+import { LoyaltyBadge } from "@/features/clients/loyalty-card";
 import { formatMoney } from "@/lib/money";
 import { formatDateUk, relativeUk } from "@/lib/time";
 import type { ClientRow } from "@/server/queries/clients";
@@ -259,8 +260,13 @@ export function ClientsTable({
                           <span className="text-[var(--fg-subtle)]">—</span>
                         )}
                       </Td>
-                      <Td className="text-right text-[13px] font-medium text-[var(--fg)] tabular-nums">
-                        {row.visits}
+                      <Td className="text-right">
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="text-[13px] font-medium text-[var(--fg)] tabular-nums">
+                            {row.visits}
+                          </span>
+                          <LoyaltyBadge visits={row.visits} />
+                        </span>
                       </Td>
                       <Td className="text-right text-[13px] font-semibold text-[var(--fg)] tabular-nums">
                         {formatMoney(row.totalCents, currency)}
