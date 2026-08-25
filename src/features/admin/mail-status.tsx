@@ -14,6 +14,7 @@ export type MailStatusProps = {
   sandboxSender: boolean;
   senderValid: boolean;
   senderDomain: string | null;
+  keyIssue: string | null;
   defaultTo: string;
 };
 
@@ -23,13 +24,23 @@ export function MailStatusCard({
   sandboxSender,
   senderValid,
   senderDomain,
+  keyIssue,
   defaultTo,
 }: MailStatusProps) {
   const [state, formAction] = useActionState(sendTestEmailAction, null);
 
   // Порядок важливий: зламану адресу відправника показуємо раніше за
   // все інше — з нею не спрацює навіть правильно налаштований ключ.
-  const level = !senderValid ? "broken" : !configured ? "off" : sandboxSender ? "sandbox" : "ok";
+  // Зіпсутий ключ — одразу за нею: без нього не піде теж нічого.
+  const level = !senderValid
+    ? "broken"
+    : !configured
+      ? "off"
+      : keyIssue
+        ? "key"
+        : sandboxSender
+          ? "sandbox"
+          : "ok";
 
   const tone =
     level === "ok"
@@ -55,7 +66,18 @@ export function MailStatusCard({
         >
           <StatusIcon className="mt-0.5 h-4 w-4 shrink-0" style={{ color: tone.fg }} />
           <div className="min-w-0 space-y-1">
-            {level === "broken" ? (
+            {level === "key" ? (
+              <>
+                <p className="text-[13px] font-medium" style={{ color: tone.fg }}>
+                  Ключ Resend виглядає зіпсутим
+                </p>
+                <p className="text-[12.5px] leading-relaxed" style={{ color: tone.fg }}>
+                  <code className="font-mono">RESEND_API_KEY</code> — {keyIssue} Resend на будь-яку
+                  з таких причин відповідає однаково: «API key is invalid», тож шукати їх по його
+                  відповіді марно.
+                </p>
+              </>
+            ) : level === "broken" ? (
               <>
                 <p className="text-[13px] font-medium" style={{ color: tone.fg }}>
                   Адреса відправника некоректна

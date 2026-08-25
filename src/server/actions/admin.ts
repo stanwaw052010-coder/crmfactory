@@ -134,6 +134,10 @@ export async function sendTestEmailAction(
       );
     }
 
+    if (status.keyIssue) {
+      return fail(`RESEND_API_KEY: ${status.keyIssue}`);
+    }
+
     const result = await sendMail({
       to: input.to,
       subject: "Перевірка пошти — crm.factory",

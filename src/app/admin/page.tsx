@@ -132,6 +132,7 @@ export default async function AdminPage() {
           sandboxSender={mail.sandboxSender}
           senderValid={mail.senderValid}
           senderDomain={mail.senderDomain}
+          keyIssue={mail.keyIssue}
           defaultTo={superAdmin.email}
         />
 

@@ -26,9 +26,50 @@ export type MailStatus = {
   senderValid: boolean;
   /** Домен відправника — його і треба підтвердити в Resend. */
   senderDomain: string | null;
+  /** Що не так із самим ключем, якщо це видно ще до звернення до Resend. */
+  keyIssue: string | null;
 };
 
 const SANDBOX_DOMAIN = "resend.dev";
+
+/** Ключі Resend: `re_`, далі букви, цифри, підкреслення й дефіси. */
+const KEY_SHAPE = /^re_[A-Za-z0-9_-]{20,}$/;
+
+/**
+ * Що не так із RESEND_API_KEY — наскільки це видно, не питаючи Resend.
+ *
+ * Сам Resend на будь-яку з цих причин відповідає однаково: 401 «API key is
+ * invalid». За цим повідомленням неможливо здогадатися, що ключ узятий у
+ * лапки або обрізаний при копіюванні, — а це найчастіші причини. Панель
+ * змінних середовища зберігає значення дослівно, разом із лапками.
+ *
+ * Повертає `null`, якщо ключ не заданий (це окремий випадок) або якщо з
+ * вигляду з ним усе гаразд — тоді слово за Resend.
+ */
+export function apiKeyIssue(): string | null {
+  const raw = process.env.RESEND_API_KEY;
+  if (!raw || !raw.trim()) return null;
+
+  const key = raw.trim();
+
+  if (/^["'`]|["'`]$/.test(key)) {
+    return "ключ узятий у лапки — панель змінних середовища зберігає їх як частину значення. Приберіть лапки на початку й у кінці.";
+  }
+  if (/\s/.test(key)) {
+    return "у ключі є пробіл або перенос рядка — найімовірніше, він скопійований не повністю.";
+  }
+  if (!key.startsWith("re_")) {
+    return "ключі Resend починаються з «re_» — схоже, у змінну потрапило щось інше.";
+  }
+  if (key.length < 23) {
+    return `ключ закороткий (${key.length} символів) — його обрізали при копіюванні. Resend показує ключ лише один раз, тож створіть новий.`;
+  }
+  if (!KEY_SHAPE.test(key)) {
+    return "у ключі є символи, яких у ключах Resend не буває — перевірте, чи скопійовано саме ключ.";
+  }
+
+  return null;
+}
 
 /**
  * Витягує email із `Назва <email@домен>` або з голої адреси.
@@ -57,6 +98,7 @@ export function mailStatus(): MailStatus {
 
   return {
     configured: mailEnabled(),
+    keyIssue: apiKeyIssue(),
     from,
     sandboxSender: domain === SANDBOX_DOMAIN,
     senderValid: email !== null,
@@ -84,7 +126,11 @@ function explainResendError(status: number, body: string): string {
     if (lowered.includes("domain") && lowered.includes("verif")) {
       return "Домен у MAIL_FROM не підтверджено в Resend. Resend → Domains → Add Domain.";
     }
-    return "Resend відхилив ключ. Перевірте RESEND_API_KEY — можливо, скопійовано не повністю.";
+    return (
+      "Resend не впізнав ключ. Найчастіше це означає, що ключ видалили або перевипустили в Resend → " +
+      "API Keys — тоді старе значення перестає діяти назавжди. Створіть новий ключ, скопіюйте його " +
+      "цілком (Resend показує ключ лише один раз) і замініть RESEND_API_KEY, після чого потрібен новий деплой."
+    );
   }
 
   if (status === 422) {
@@ -125,6 +171,14 @@ function fromAddress(): string {
 
 export async function sendMail(message: MailMessage): Promise<MailResult> {
   const apiKey = process.env.RESEND_API_KEY?.trim();
+
+  // Якщо вигляд ключа явно неправильний, звертатися до Resend немає сенсу:
+  // він відповість беззмістовним «API key is invalid», а причина відома вже тут.
+  const issue = apiKeyIssue();
+  if (apiKey && issue) {
+    console.error(`[mail] RESEND_API_KEY: ${issue}`);
+    return { channel: "email", error: `RESEND_API_KEY: ${issue}` };
+  }
 
   if (!apiKey) {
     console.warn(
