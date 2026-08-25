@@ -80,6 +80,19 @@ export async function askAssistant(params: {
   const client = new Anthropic({ apiKey });
   const toolsUsed: string[] = [];
 
+  /**
+   * Лічильники токенів за все питання.
+   *
+   * Потрібні, щоб кешування можна було ПЕРЕВІРИТИ, а не вірити на слово:
+   * префікс (інструкція + опис інструментів) виходить близько 1000–1600
+   * токенів, а мінімум для кешу — 1024. Це межа, тож єдиний чесний
+   * спосіб дізнатися — подивитися, що відповів API.
+   *
+   * Якщо `cacheRead` лишається нулем у кожному питанні — кеш не працює,
+   * і префікс треба або збільшити, або перестати на нього розраховувати.
+   */
+  const usage = { input: 0, output: 0, cacheWrite: 0, cacheRead: 0 };
+
   const messages: Anthropic.MessageParam[] = [
     ...params.history.map((turn) => ({
       role: turn.role,
@@ -107,10 +120,29 @@ export async function askAssistant(params: {
         // показників, тож адаптивне мислення тут доречне.
         thinking: { type: "adaptive" },
         output_config: { effort: "medium" },
-        system,
+        // Кешування незмінної частини запиту.
+        //
+        // Порядок складання запиту — tools → system → messages, тож
+        // позначка в кінці system накриває і опис інструментів, і саму
+        // інструкцію. Вони однакові в кожному зверненні, а змінюється
+        // лише листування.
+        //
+        // Виграш гарантований уже всередині одного питання: модель
+        // ходить по дані 2–4 рази поспіль, і кожне наступне звернення
+        // читає цей блок із кешу за десяту частину ціни. Між різними
+        // питаннями кеш живе 5 хвилин — спрацює, якщо власниця ставить
+        // їх поспіль, і просто не спрацює, якщо раз на день.
+        system: [
+          { type: "text", text: system, cache_control: { type: "ephemeral" } },
+        ],
         tools: AI_TOOLS as unknown as Anthropic.Tool[],
         messages,
       });
+
+      usage.input += response.usage.input_tokens ?? 0;
+      usage.output += response.usage.output_tokens ?? 0;
+      usage.cacheWrite += response.usage.cache_creation_input_tokens ?? 0;
+      usage.cacheRead += response.usage.cache_read_input_tokens ?? 0;
 
       if (response.stop_reason === "refusal") {
         return { ok: false, error: "Не можу відповісти на це питання." };
@@ -128,6 +160,12 @@ export async function askAssistant(params: {
           .map((block) => block.text)
           .join("\n")
           .trim();
+
+        console.info(
+          `[factory-ai] ${model()} · звернень ${round + 1} · вхід ${usage.input} · ` +
+            `вихід ${usage.output} · кеш записано ${usage.cacheWrite} · ` +
+            `кеш прочитано ${usage.cacheRead}`,
+        );
 
         return text
           ? { ok: true, text, toolsUsed }
