@@ -17,6 +17,17 @@ const REQUIRED = [
         : "має починатися з postgresql:// або postgres://",
   },
   {
+    name: "DIRECT_URL",
+    hint:
+      "Пряме підключення до тієї самої бази, в обхід пулера — його вимагають міграції.\n" +
+      "    У Neon це адреса БЕЗ `-pooler` у хості, у Supabase — порт 5432 замість 6543.\n" +
+      "    Локально пулера немає: просто скопіюйте сюди значення DATABASE_URL.",
+    check: (value) =>
+      value.includes("-pooler") || value.includes(":6543")
+        ? "вказує на пулер, а не на пряме підключення — саме через це зупиняється prisma migrate deploy"
+        : null,
+  },
+  {
     name: "AUTH_SECRET",
     hint: "Секрет для підпису сесій. Згенеруйте: openssl rand -base64 48",
     check: (value) => (value.length >= 32 ? null : "закороткий — потрібно щонайменше 32 символи"),
