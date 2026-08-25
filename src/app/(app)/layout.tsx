@@ -6,6 +6,8 @@ import { Topbar } from "@/components/layout/topbar";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { CommandMenu } from "@/components/layout/command-menu";
 import { KeyboardShortcuts } from "@/components/layout/keyboard-shortcuts";
+import { AssistantPanel } from "@/features/ai/assistant-panel";
+import { aiEnabled } from "@/lib/ai/assistant";
 import { PageTransition } from "@/components/layout/page-transition";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -83,6 +85,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <MobileNav permissions={permissions} />
       <CommandMenu permissions={permissions} />
       <KeyboardShortcuts permissions={permissions} />
+      {ctx.permissions.has("analytics.view") && <AssistantPanel enabled={aiEnabled()} />}
     </div>
   );
 }

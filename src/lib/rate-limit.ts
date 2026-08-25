@@ -46,4 +46,7 @@ export const LIMITS = {
   recovery: { limit: 5, windowSec: 3600 },
   booking: { limit: 10, windowSec: 600 },
   search: { limit: 120, windowSec: 60 },
+  // AI коштує грошей за кожен запит — ліміт тут не про навантаження,
+  // а про рахунок власника платформи.
+  ai: { limit: 30, windowSec: 3600 },
 } as const;
