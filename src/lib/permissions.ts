@@ -30,6 +30,8 @@ export const PERMISSIONS = [
   "payment.manage",
   "analytics.view",
   "ai.use",
+  "review.view",
+  "review.manage",
   "pipeline.view",
   "pipeline.manage",
   "settings.view",
@@ -64,6 +66,8 @@ const MANAGER_PERMISSIONS: Permission[] = [
   "payment.manage",
   "analytics.view",
   "ai.use",
+  "review.view",
+  "review.manage",
   "pipeline.view",
   "pipeline.manage",
   "settings.view",
@@ -78,6 +82,7 @@ const EMPLOYEE_PERMISSIONS: Permission[] = [
   "service.view",
   "employee.view",
   "schedule.manage_own",
+  "review.view",
   "pipeline.view",
 ];
 

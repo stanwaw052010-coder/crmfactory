@@ -15,6 +15,7 @@ import {
   Search,
   Settings,
   Sparkles,
+  Star,
   UserPlus,
   UserRound,
   Users,
@@ -114,6 +115,7 @@ export function CommandMenu({ permissions }: { permissions: string[] }) {
       { id: "pipeline", label: "Воронка", icon: KanbanSquare, href: "/pipeline", group: "Перейти" },
       { id: "sales", label: "Продажі", icon: CreditCard, href: "/sales", group: "Перейти" },
       { id: "analytics", label: "Аналітика", icon: BarChart3, href: "/analytics", group: "Перейти" },
+      { id: "reviews", label: "Відгуки", icon: Star, href: "/reviews", group: "Перейти" },
       { id: "settings", label: "Налаштування", icon: Settings, href: "/settings", group: "Перейти" },
     ];
     const required: Record<string, string> = {

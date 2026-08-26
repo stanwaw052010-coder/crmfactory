@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Confetti, DrawnCheck } from "@/components/shared/celebrate";
+import { PublicReviews, type PublicReview } from "@/features/booking/public-reviews";
 import { VenueCard } from "@/features/booking/venue-card";
 import { Avatar } from "@/components/ui/avatar";
 import { Field, Input, Textarea } from "@/components/ui/input";
@@ -127,12 +128,18 @@ export function BookingFlow({
   services,
   employees,
   gallery = [],
+  reviews = [],
+  reviewAverage = null,
+  reviewCount = 0,
   hours = [],
 }: {
   organization: Organization;
   services: Service[];
   employees: Employee[];
   gallery?: GalleryPhoto[];
+  reviews?: PublicReview[];
+  reviewAverage?: number | null;
+  reviewCount?: number;
   hours?: BusinessHour[];
 }) {
   const [step, setStep] = React.useState(0);
@@ -228,7 +235,15 @@ export function BookingFlow({
 
   if (!organization.enabled) {
     return (
-      <Shell organization={organization} accent={accent} gallery={gallery} hours={hours}>
+      <Shell
+        organization={organization}
+        accent={accent}
+        gallery={gallery}
+        hours={hours}
+        reviews={reviews}
+        reviewAverage={reviewAverage}
+        reviewCount={reviewCount}
+      >
         <div className="card">
           <EmptyState
             icon={CalendarX2}
@@ -246,7 +261,15 @@ export function BookingFlow({
 
   if (services.length === 0 || employees.length === 0) {
     return (
-      <Shell organization={organization} accent={accent} gallery={gallery} hours={hours}>
+      <Shell
+        organization={organization}
+        accent={accent}
+        gallery={gallery}
+        hours={hours}
+        reviews={reviews}
+        reviewAverage={reviewAverage}
+        reviewCount={reviewCount}
+      >
         <div className="card">
           <EmptyState
             icon={Sparkles}
@@ -260,7 +283,15 @@ export function BookingFlow({
 
   if (confirmation) {
     return (
-      <Shell organization={organization} accent={accent} gallery={gallery} hours={hours}>
+      <Shell
+        organization={organization}
+        accent={accent}
+        gallery={gallery}
+        hours={hours}
+        reviews={reviews}
+        reviewAverage={reviewAverage}
+        reviewCount={reviewCount}
+      >
         <motion.div
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -332,7 +363,15 @@ export function BookingFlow({
   const maxOffset = Math.ceil(Math.min(organization.horizonDays, 45) / 7) - 1;
 
   return (
-    <Shell organization={organization} accent={accent} gallery={gallery} hours={hours}>
+    <Shell
+        organization={organization}
+        accent={accent}
+        gallery={gallery}
+        hours={hours}
+        reviews={reviews}
+        reviewAverage={reviewAverage}
+        reviewCount={reviewCount}
+      >
       <BookingSteps step={step} accent={accent} onJump={setStep} />
 
       <AnimatePresence mode="wait">
@@ -741,10 +780,16 @@ function Shell({
   accent,
   gallery = [],
   hours = [],
+  reviews = [],
+  reviewAverage = null,
+  reviewCount = 0,
   children,
 }: {
   gallery?: GalleryPhoto[];
   hours?: BusinessHour[];
+  reviews?: PublicReview[];
+  reviewAverage?: number | null;
+  reviewCount?: number;
   organization: Organization;
   accent: string;
   children: React.ReactNode;
@@ -834,6 +879,14 @@ function Shell({
           tiktokUrl={organization.tiktokUrl}
           accent={accent}
         />
+
+        {/* Відгуки під картками салону, але НАД підписом: людина спершу
+            обирає час, потім розглядає салон, і лише тоді читає, що про
+            нього кажуть. Ставити їх вище означало б відсунути саму форму
+            запису — те, заради чого сторінку й відкрили. */}
+        <div className="mt-6">
+          <PublicReviews reviews={reviews} average={reviewAverage} total={reviewCount} />
+        </div>
 
         <p className="mt-6 text-center text-[12px] text-[var(--fg-subtle)]">
           Працює на{" "}

@@ -13,6 +13,7 @@ import { fail, ok, toActionError, type ActionResult } from "@/lib/errors";
 import { audit } from "@/lib/audit";
 import { notify } from "@/lib/notifications";
 import { runAutomations } from "@/server/automation-engine";
+import { cancelReviewRequest, scheduleReviewRequest } from "@/lib/reviews";
 import {
   cancelAppointmentReminders,
   scheduleAppointmentReminders,
@@ -374,8 +375,16 @@ export async function setAppointmentStatusAction(input: {
       });
     }
 
+    // Візит відбувся — за кілька годин спитаємо враження, поки свіже.
+    if (parsed.status === "COMPLETED") {
+      await scheduleReviewRequest(parsed.id);
+    }
+
     if (parsed.status === "CANCELLED" || parsed.status === "NO_SHOW") {
       await cancelAppointmentReminders(parsed.id);
+      // Візит зняли вже після позначки «завершено» — питати враження
+      // про те, чого не було, гірше за мовчання.
+      await cancelReviewRequest(parsed.id);
       await notify({
         organizationId: ctx.organization.id,
         type: "BOOKING_CANCELLED",

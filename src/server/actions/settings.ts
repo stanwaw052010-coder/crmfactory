@@ -7,6 +7,7 @@ import {
   bookingSettingsSchema,
   businessHoursSchema,
   notificationSettingsSchema,
+  reviewSettingsSchema,
   organizationSchema,
 } from "@/lib/validation";
 import { fail, ok, toActionError, type ActionResult } from "@/lib/errors";
@@ -177,6 +178,35 @@ export async function updateNotificationSettingsAction(
     });
 
     revalidatePath("/settings/notifications");
+    return ok(null);
+  } catch (error) {
+    return toActionError(error);
+  }
+}
+
+export async function updateReviewSettingsAction(
+  _prev: ActionResult<null> | null,
+  formData: FormData,
+): Promise<ActionResult<null>> {
+  try {
+    const ctx = await requirePermission("settings.manage");
+    const input = reviewSettingsSchema.parse({
+      reviewsEnabled: formData.get("reviewsEnabled") === "on",
+      reviewDelayHours: formData.get("reviewDelayHours"),
+      reviewPublicUrl: formData.get("reviewPublicUrl") ?? "",
+    });
+
+    await prisma.organization.update({
+      where: { id: ctx.organization.id },
+      data: {
+        reviewsEnabled: input.reviewsEnabled,
+        reviewDelayHours: input.reviewDelayHours,
+        reviewPublicUrl: input.reviewPublicUrl,
+      },
+    });
+
+    revalidatePath("/settings/notifications");
+    revalidatePath("/reviews");
     return ok(null);
   } catch (error) {
     return toActionError(error);

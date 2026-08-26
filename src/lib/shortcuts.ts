@@ -27,6 +27,7 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: ["g", "t"], label: "Команда", href: "/employees", permission: "employee.view", group: "Навігація" },
   { keys: ["g", "p"], label: "Воронка", href: "/pipeline", permission: "pipeline.view", group: "Навігація" },
   { keys: ["g", "a"], label: "Аналітика", href: "/analytics", permission: "analytics.view", group: "Навігація" },
+  { keys: ["g", "v"], label: "Відгуки", href: "/reviews", permission: "review.view", group: "Навігація" },
   { keys: ["g", "n"], label: "Налаштування", href: "/settings", permission: "settings.view", group: "Навігація" },
 
   { keys: ["n"], label: "Новий запис", href: "/calendar?new=1", permission: "appointment.create", group: "Дії" },

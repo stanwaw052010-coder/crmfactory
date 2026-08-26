@@ -296,3 +296,73 @@ ${detailsBlock(params)}
     text,
   };
 }
+
+/**
+ * Лист із проханням оцінити візит.
+ *
+ * Зірки — окремі посилання, кожне зі своєю оцінкою в адресі. Це і є вся
+ * хитрість: людина ставить оцінку одним дотиком прямо з пошти, а сторінка
+ * відкривається вже з обраною зіркою. Форма, яку треба спершу відкрити й
+ * лише потім заповнити, втрачає більшість людей на першому ж кроці.
+ *
+ * Малюємо зірки текстом (★ ☆) у посиланнях, а не картинками: більшість
+ * поштових клієнтів блокують зовнішні зображення до дозволу користувача,
+ * і замість зірок людина побачила б порожні рамки.
+ */
+export function reviewRequestEmail(params: {
+  businessName: string;
+  clientName: string;
+  service: string;
+  employee: string | null;
+  visitedAt: Date;
+  /** Базове посилання; до нього додається обрана оцінка. */
+  reviewUrl: string;
+  appUrl?: string;
+}): { subject: string; html: string; text: string } {
+  const base = encodeURI(params.reviewUrl);
+  const home = params.appUrl ?? params.reviewUrl;
+
+  const star = (value: number) => `<a href="${base}?r=${value}"
+      style="display:inline-block;padding:4px 6px;font-size:34px;line-height:1;color:#f59e0b;text-decoration:none;"
+      title="${value} з 5">★</a>`;
+
+  const body = `
+<p style="margin:0 0 8px 0;font-size:15px;line-height:1.6;color:#334155;">
+  ${escapeHtml(params.clientName || "Вітаємо")}, дякуємо, що завітали до
+  ${escapeHtml(params.businessName)}.
+</p>
+<p style="margin:0 0 20px 0;font-size:15px;line-height:1.6;color:#334155;">
+  ${escapeHtml(params.service)}${params.employee ? `, майстер ${escapeHtml(params.employee)}` : ""} —
+  ${escapeHtml(formatDay(params.visitedAt))}. Як усе пройшло?
+</p>
+
+<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 20px 0;background:#f6f8fc;border-radius:12px;">
+  <tr>
+    <td align="center" style="padding:18px 12px;">
+      <div style="margin:0 0 4px 0;">${[1, 2, 3, 4, 5].map(star).join("")}</div>
+      <div style="font-size:12.5px;color:#94a3b8;">Оберіть оцінку — це один дотик</div>
+    </td>
+  </tr>
+</table>
+
+<p style="margin:0;font-size:13px;line-height:1.6;color:#64748b;">
+  Ваша думка допомагає нам стати кращими. Якщо щось було не так — напишіть,
+  будь ласка, що саме: ми хочемо про це знати.
+</p>`;
+
+  const text = [
+    `${params.clientName || "Вітаємо"}, дякуємо, що завітали до ${params.businessName}.`,
+    `${params.service}${params.employee ? `, майстер ${params.employee}` : ""} — ${formatDay(params.visitedAt)}.`,
+    "",
+    "Як усе пройшло? Оцініть візит:",
+    ...[1, 2, 3, 4, 5].map((value) => `  ${value} з 5 — ${params.reviewUrl}?r=${value}`),
+    "",
+    "Якщо щось було не так — напишіть, що саме: ми хочемо про це знати.",
+  ].join("\n");
+
+  return {
+    subject: `Як пройшов ваш візит у ${params.businessName}?`,
+    html: shell("Як усе пройшло?", body, home),
+    text,
+  };
+}

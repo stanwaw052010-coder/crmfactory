@@ -56,6 +56,8 @@ const PERMISSION_LABELS: Record<string, string> = {
   "payment.view": "Бачити продажі",
   "payment.manage": "Керувати продажами",
   "analytics.view": "Аналітика",
+  "review.view": "Перегляд відгуків",
+  "review.manage": "Відповіді на відгуки",
   "pipeline.view": "Бачити воронку",
   "pipeline.manage": "Керувати воронкою",
   "settings.view": "Бачити налаштування",

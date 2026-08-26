@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Settings,
   Sparkles,
+  Star,
   Users,
   UserRound,
 } from "lucide-react";
@@ -29,5 +30,6 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/pipeline", label: "Воронка", icon: KanbanSquare, permission: "pipeline.view" },
   { href: "/sales", label: "Продажі", icon: CreditCard, permission: "payment.view" },
   { href: "/analytics", label: "Аналітика", icon: BarChart3, permission: "analytics.view" },
+  { href: "/reviews", label: "Відгуки", icon: Star, permission: "review.view" },
   { href: "/settings", label: "Налаштування", icon: Settings, permission: "settings.view" },
 ];

@@ -287,6 +287,24 @@ export const notificationSettingsSchema = z.object({
   channels: z.array(z.enum(["IN_APP", "EMAIL", "TELEGRAM", "SMS", "WHATSAPP"])).min(1),
 });
 
+export const reviewSettingsSchema = z.object({
+  reviewsEnabled: z.boolean().default(true),
+  /// Кілька годин після візиту — поки враження свіже, але людина вже вийшла
+  /// із салону. Тиждень — стеля: пізніше питати немає сенсу.
+  reviewDelayHours: z.coerce.number().int().min(1).max(168),
+  reviewPublicUrl: z
+    .string()
+    .trim()
+    .max(500)
+    .refine((value) => value === "" || /^https:\/\/\S+$/.test(value), {
+      // Тільки https і тільки посилання: це поле веде клієнта назовні,
+      // і будь-що інше тут або не спрацює, або відкриє чужий редирект.
+      message: "Потрібне посилання, що починається з https://",
+    })
+    .transform((value) => (value === "" ? null : value))
+    .nullable(),
+});
+
 export const memberRoleSchema = z.object({
   membershipId: z.string().min(1),
   role: z.enum(["OWNER", "ADMIN", "MANAGER", "EMPLOYEE"]),

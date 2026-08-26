@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
+import { listPublicReviews } from "@/server/queries/reviews";
 import { listMedia } from "@/server/media";
 import { venueMapUrl } from "@/lib/maps";
 import { BookingFlow } from "@/features/booking/booking-flow";
@@ -48,7 +49,7 @@ export default async function PublicBookingPage({ params }: { params: Params }) 
   if (!organization) notFound();
 
   // Публічно віддаємо лише те, що справді доступне для запису.
-  const [services, employees, gallery, hours] = await Promise.all([
+  const [services, employees, gallery, hours, reviews] = await Promise.all([
     prisma.service.findMany({
       where: { organizationId: organization.id, isActive: true, onlineBooking: true },
       include: {
@@ -68,10 +69,25 @@ export default async function PublicBookingPage({ params }: { params: Params }) 
       select: { weekday: true, openMinute: true, closeMinute: true, isClosed: true },
       orderBy: { weekday: "asc" },
     }),
+    listPublicReviews(organization.id),
   ]);
+
+  // Середня — тільки за опублікованими: показувати «4.8» під списком із
+  // трьох відгуків, порахувавши її по всіх, включно з прихованими, було б
+  // тихою неправдою на публічній сторінці.
+  const reviewAverage =
+    reviews.length > 0
+      ? Math.round((reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length) * 10) / 10
+      : null;
 
   return (
     <BookingFlow
+      reviews={reviews.map((review) => ({
+        ...review,
+        submittedAt: review.submittedAt.toISOString(),
+      }))}
+      reviewAverage={reviewAverage}
+      reviewCount={reviews.length}
       organization={{
         name: organization.name,
         slug: organization.slug,

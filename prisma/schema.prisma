@@ -179,6 +179,13 @@ model Organization {
   mapsUrl      String?
 
   // Налаштування нагадувань (канали — під майбутні інтеграції)
+  // Відгуки
+  reviewsEnabled   Boolean @default(true)
+  /// Через скільки годин після візиту питати враження.
+  reviewDelayHours Int     @default(4)
+  /// Куди вести тих, хто готовий написати публічно (Google Maps тощо).
+  reviewPublicUrl  String?
+
   reminderEnabled     Boolean @default(true)
   reminderHoursBefore Int     @default(24)
   reminderChannels    String  @default("IN_APP")
@@ -199,6 +206,7 @@ model Organization {
   businessHours  BusinessHours[]
   reminders      ReminderJob[]
   auditLogs      AuditLog[]
+  reviews        Review[]
   media          MediaAsset[]
   automations    Automation[]
   automationRuns AutomationRun[]
@@ -386,6 +394,7 @@ model Employee {
   exceptions   ScheduleException[]
   services     EmployeeService[]
   appointments Appointment[]
+  reviews      Review[]
   payments     Payment[]
   leads        Lead[]
 
@@ -519,6 +528,7 @@ model Client {
   appointments Appointment[]
   payments     Payment[]
   notes        ClientNote[]
+  reviews      Review[]
   leads        Lead[]
 
   @@index([organizationId])
@@ -585,6 +595,7 @@ model Appointment {
   createdBy    User?         @relation("AppointmentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   payments     Payment[]
   reminders    ReminderJob[]
+  reviews      Review[]
 
   @@index([organizationId, startAt])
   @@index([organizationId, status])
@@ -747,6 +758,74 @@ model ReminderJob {
 
   @@index([status, scheduledFor])
   @@index([appointmentId])
+}
+
+/// Стан ЗАПИТУ відгуку — того, як ми його просимо.
+/// Наявність самої оцінки описується полем `rating`, а не цим статусом:
+/// надісланий лист і отримана відповідь — різні речі, і плутати їх в одному
+/// полі означає рано чи пізно втратити одне з них.
+enum ReviewRequestStatus {
+  PENDING
+  SENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+/// Відгук про візит.
+///
+/// Один візит — один відгук (`appointmentId` унікальний). Питаємо через
+/// `reviewDelayHours` годин після візиту, поки враження свіже.
+///
+/// ВАЖЛИВО про те, чого тут НЕМАЄ: відбору за оцінкою. Схема «п'ять зірок
+/// веду на Google, менше — ховаю» називається review gating і прямо
+/// заборонена правилами Google: за неї площадка може зняти бізнесу всі
+/// відгуки одразу. Тож посилання на публічну площадку бачать усі, а
+/// низька оцінка лише додає крок «розкажіть, що сталося» — щоб людину
+/// спершу вислухали ми.
+model Review {
+  id             String              @id @default(cuid())
+  organizationId String
+  appointmentId  String              @unique
+  clientId       String
+  employeeId     String?
+
+  /// Посилання з листа. У базі — лише хеш: лист живе в чужій поштовій
+  /// скриньці, і витік бекапу не має відкривати чужі відгуки.
+  tokenHash String              @unique
+  status    ReviewRequestStatus @default(PENDING)
+  /// Коли просити. Не раніше — інакше запитаємо в момент візиту.
+  sendAfter DateTime
+  /// Коли попросили. Порожнє — лист ще не пішов.
+  requestedAt DateTime?
+  /// Після цієї дати посилання не працює.
+  expiresAt   DateTime
+  attempts    Int       @default(0)
+  error       String?
+
+  /// 1..5. Порожнє — клієнт ще не відповів.
+  rating      Int?
+  comment     String?
+  submittedAt DateTime?
+
+  /// Чи показувати відгук на публічній сторінці салону.
+  /// Вирішує салон, не клієнт: інакше публічна сторінка стає
+  /// некерованою стрічкою.
+  isPublic  Boolean   @default(false)
+  replyText String?
+  repliedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  appointment  Appointment  @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  client       Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  employee     Employee?    @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, submittedAt])
+  @@index([organizationId, rating])
+  @@index([status, sendAfter])
 }
 
 // ─── Аудит ───────────────────────────────────────────────────────────────────

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { dispatchDueReminders } from "@/lib/reminders";
+import { dispatchDueReviewRequests } from "@/lib/reviews";
 import { safeCompare } from "@/lib/auth/password-reset";
 
 /**
@@ -24,6 +25,9 @@ export const maxDuration = 60;
 /** Скільки задач за один запуск. Обмежене, щоб не впертися в ліміт функції. */
 const BATCH = 50;
 
+/** Відгуків за запуск менше: вони не термінові, а функція одна на обидві черги. */
+const REVIEW_BATCH = 25;
+
 function authorized(request: Request): boolean {
   const secret = process.env.CRON_SECRET?.trim();
   if (!secret) return false;
@@ -46,16 +50,26 @@ async function run(request: Request) {
   }
 
   const started = Date.now();
-  const result = await dispatchDueReminders(BATCH);
+
+  // Дві черги, один планувальник. Заводити другий cron заради відгуків
+  // означало б удвічі більше налаштувань на боці власника платформи —
+  // і другий спосіб зламатися.
+  //
+  // Послідовно, а не Promise.all: обидві черги пишуть у ту саму базу й
+  // ходять до тієї самої пошти, а виграш у пару секунд для фонової задачі
+  // не вартий подвоєного навантаження в піку.
+  const reminders = await dispatchDueReminders(BATCH);
+  const reviews = await dispatchDueReviewRequests(REVIEW_BATCH);
   const ms = Date.now() - started;
 
-  // Лог має бути читабельним у консолі Vercel: якщо нагадування не доходять,
+  // Лог має бути читабельним у консолі Vercel: якщо листи не доходять,
   // саме сюди дивляться першим ділом.
   console.log(
-    `[cron] нагадування: взято ${result.picked}, надіслано ${result.sent}, провалено ${result.failed}, ${ms} мс`,
+    `[cron] нагадування: взято ${reminders.picked}, надіслано ${reminders.sent}, провалено ${reminders.failed} · ` +
+      `відгуки: взято ${reviews.picked}, надіслано ${reviews.sent}, провалено ${reviews.failed} · ${ms} мс`,
   );
 
-  return NextResponse.json({ ...result, ms });
+  return NextResponse.json({ reminders, reviews, ms });
 }
 
 // GET — щоб роут міг смикнути будь-який простий планувальник; POST — для тих,
